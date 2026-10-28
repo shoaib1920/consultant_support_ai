@@ -59,7 +59,8 @@ export class FirestoreRepo implements Repo {
   async list<T>(c: CollectionName, where?: Where[], opts?: ListOptions): Promise<T[]> {
     const q = applyQuery(this.db.collection(c), where, opts);
     const snap = this.tx ? await this.tx.get(q) : await q.get();
-    return snap.docs.map((d: QueryDocumentSnapshot) => (this.tx ? this.overlay(c, d.id, d.data()) : d.data()) as T).filter(Boolean);
+    // always expose the real document id (some internal docs, e.g. auditHeads, have no id field)
+    return snap.docs.map((d: QueryDocumentSnapshot) => (this.tx ? this.overlay(c, d.id, { id: d.id, ...d.data() }) : { id: d.id, ...d.data() }) as T).filter(Boolean);
   }
 
   async set<T extends object>(c: CollectionName, id: string, doc: T): Promise<void> {
