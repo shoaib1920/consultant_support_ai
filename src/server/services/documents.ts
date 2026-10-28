@@ -17,7 +17,8 @@ import { refreshStudentCases } from "./eligibility";
 import { syncTasks } from "./tasks";
 
 export const ALLOWED_MIME = ["application/pdf", "image/jpeg", "image/png", "image/webp", "application/json", "text/plain"];
-export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
+// Vercel rejects request bodies over 4.5 MB, so files are capped at 4 MB end to end.
+export const MAX_UPLOAD_BYTES = 4 * 1024 * 1024;
 
 export class ValidationError extends Error {
   constructor(message: string) {
@@ -46,7 +47,7 @@ export interface UploadInput {
 export async function uploadDocument(repo: Repo, actor: Actor, input: UploadInput): Promise<DocumentRecord> {
   assertStudentAccess(actor, input.studentId, "doc.upload");
   if (!ALLOWED_MIME.includes(input.mimeType)) throw new ValidationError(`File type ${input.mimeType} is not allowed. Use PDF, JPG, PNG or WEBP.`);
-  if (input.bytes.length === 0 || input.bytes.length > MAX_UPLOAD_BYTES) throw new ValidationError("File must be between 1 byte and 10 MB.");
+  if (input.bytes.length === 0 || input.bytes.length > MAX_UPLOAD_BYTES) throw new ValidationError("File must be under 4 MB. For a large PDF, compress it or upload pages as separate images.");
   const student = await repo.get<Student>("students", input.studentId);
   if (!student || student.organizationId !== actor.organizationId) throw new NotFoundError("Student");
   const id = newId("dc_");

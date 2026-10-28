@@ -13,9 +13,12 @@ import { NotFoundError } from "./bundle";
 import { ALLOWED_MIME, MAX_UPLOAD_BYTES, ValidationError } from "./documents";
 import type { PaymentRequest } from "./gates";
 
+/** Fees that are never refundable in practice; they always go through pre-flight, whatever the form says. */
+export const ALWAYS_NON_REFUNDABLE: ReadonlySet<string> = new Set(["application_fee", "tuition_deposit", "visa_fee", "ihs", "attestation_fee"]);
+
 export async function recordRefundablePayment(repo: Repo, actor: Actor, caseId: string, p: PaymentRequest) {
   assertCan(actor, "payment.record");
-  if (!p.refundable) {
+  if (!p.refundable || ALWAYS_NON_REFUNDABLE.has(p.type)) {
     throw new GateError("Non-refundable payments require pre-flight", ["Non-refundable money can only be authorised through the pre-flight screen (Officer + Manager confirmation, gates passed)."]);
   }
   return repo.transaction(async (tx) => {
@@ -61,7 +64,7 @@ export async function setPaymentStatus(repo: Repo, actor: Actor, paymentId: stri
 
 export async function attachReceipt(repo: Repo, actor: Actor, paymentId: string, file: { name: string; mimeType: string; bytes: Buffer }) {
   assertCan(actor, "payment.record");
-  if (!ALLOWED_MIME.includes(file.mimeType) || file.bytes.length > MAX_UPLOAD_BYTES) throw new ValidationError("Receipt must be PDF/JPG/PNG up to 10 MB.");
+  if (!ALLOWED_MIME.includes(file.mimeType) || file.bytes.length > MAX_UPLOAD_BYTES) throw new ValidationError("Receipt must be PDF/JPG/PNG up to 4 MB.");
   const p = await repo.get<Payment>("payments", paymentId);
   if (!p || p.organizationId !== actor.organizationId) throw new NotFoundError("Payment");
   const path = `orgs/${actor.organizationId}/receipts/${paymentId}/${file.name.replace(/[^\w.\- ]+/g, "_")}`;

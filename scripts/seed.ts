@@ -1,13 +1,6 @@
 // Usage: npm run seed   (re-creates the demo organisation; uses Firestore if FIREBASE_SERVICE_ACCOUNT_JSON is set)
 // Reads .env.local so you can seed Firestore from your machine before deploying.
-import fs from "node:fs";
-
-if (fs.existsSync(".env.local")) {
-  for (const line of fs.readFileSync(".env.local", "utf8").split(/\r?\n/)) {
-    const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/);
-    if (m && !process.env[m[1]]) process.env[m[1]] = m[2].replace(/^(['"])(.*)\1$/, "$2");
-  }
-}
+import "./load-env";
 
 (async () => {
   const { getRepo } = await import("../src/server/db");

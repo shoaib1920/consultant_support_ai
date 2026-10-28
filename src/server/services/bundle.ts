@@ -60,7 +60,7 @@ export async function loadCaseBundle(repo: Repo, organizationId: string, caseId:
     repo.list<RiskAcknowledgment>("riskAcknowledgments", [org, ["caseId", "==", caseId]]),
     repo.list<Payment>("payments", [org, ["caseId", "==", caseId]]),
     repo.list<Rule>("rules", [org]),
-    kase.programmeId ? repo.get<Programme>("programmes", kase.programmeId) : Promise.resolve(null),
+    kase.programmeId ? repo.get<Programme>("programmes", kase.programmeId).then((p) => (p?.organizationId === organizationId ? p : null)) : Promise.resolve(null),
   ]);
   if (!student) throw new NotFoundError("Student");
   // Documents for this case = case-specific docs + student-level docs (no caseId)

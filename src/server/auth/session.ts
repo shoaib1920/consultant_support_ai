@@ -39,6 +39,8 @@ export async function actorFromToken(token: string | undefined): Promise<Actor |
       return null;
     }
   } else {
+    // Demo-login cookies are only honoured in demo mode, or when there is no Firebase at all (local mock).
+    if (firebaseConfigured() && !demoMode()) return null;
     const p = verifyPayload<{ uid: string; exp: number }>(token);
     if (!p || p.exp < Date.now()) return null;
     uid = p.uid;
@@ -83,6 +85,10 @@ export async function issueMockSession(uid: string) {
 export async function issueFirebaseSession(idToken: string) {
   const { getAuth } = await import("firebase-admin/auth");
   const { getAdminApp } = await import("../firebase-admin");
+  const { uid } = await getAuth(getAdminApp()).verifyIdToken(idToken);
+  const user = await (await getRepo()).get<User>("users", uid);
+  if (!user) throw new AuthError("This login is not linked to any consultancy yet. Ask your administrator to add you.", 403);
+  if (!user.active) throw new AuthError("Your account has been deactivated. Contact your administrator.", 403);
   const expiresIn = SESSION_DAYS * 86_400_000;
   const cookie = await getAuth(getAdminApp()).createSessionCookie(idToken, { expiresIn });
   const jar = await cookies();
@@ -91,9 +97,22 @@ export async function issueFirebaseSession(idToken: string) {
 
 export async function clearSession() {
   const jar = await cookies();
+  const token = jar.get(SESSION_COOKIE)?.value;
   jar.delete(SESSION_COOKIE);
+  // revoke the Firebase session too, so a copied cookie stops working at logout
+  if (token && firebaseConfigured() && token.split(".").length === 3) {
+    try {
+      const { getAuth } = await import("firebase-admin/auth");
+      const { getAdminApp } = await import("../firebase-admin");
+      const auth = getAuth(getAdminApp());
+      await auth.revokeRefreshTokens((await auth.verifySessionCookie(token)).uid);
+    } catch {
+      // already invalid; nothing to revoke
+    }
+  }
 }
 
+/** Demo mode is opt-in: only DEMO_MODE=true enables demo login, demo banner and auto-seeding. */
 export function demoMode(): boolean {
-  return process.env.DEMO_MODE !== "false";
+  return process.env.DEMO_MODE === "true";
 }

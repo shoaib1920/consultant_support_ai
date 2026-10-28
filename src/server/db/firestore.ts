@@ -15,6 +15,12 @@ function clean<T>(doc: T): T {
   return JSON.parse(JSON.stringify(doc)); // strip undefined (Firestore rejects it)
 }
 
+/** Update patch for Firestore: undefined means "remove this field" (Firestore rejects raw undefined). */
+async function firestorePatch(patch: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const { FieldValue } = await import("firebase-admin/firestore");
+  return Object.fromEntries(Object.entries(patch).map(([k, v]) => [k, v === undefined ? FieldValue.delete() : clean(v)]));
+}
+
 type Pending = { op: "set"; doc: Record<string, unknown> } | { op: "update"; patch: Record<string, unknown> } | { op: "delete" };
 
 /**
@@ -38,7 +44,7 @@ export class FirestoreRepo implements Repo {
     let cur = base;
     for (const p of this.pending.get(this.key(c, id)) ?? []) {
       if (p.op === "set") cur = { ...p.doc };
-      else if (p.op === "update") cur = cur ? { ...cur, ...p.patch } : cur;
+      else if (p.op === "update") cur = cur ? Object.fromEntries(Object.entries({ ...cur, ...p.patch }).filter(([, v]) => v !== undefined)) : cur;
       else cur = null;
     }
     return cur;
@@ -69,8 +75,8 @@ export class FirestoreRepo implements Repo {
   }
 
   async update<T extends object>(c: CollectionName, id: string, patch: Partial<T>): Promise<void> {
-    if (this.tx) return this.queue(c, id, { op: "update", patch: clean(patch) as Record<string, unknown> });
-    await this.db.collection(c).doc(id).update(clean(patch) as Record<string, unknown>);
+    if (this.tx) return this.queue(c, id, { op: "update", patch: { ...(patch as Record<string, unknown>) } });
+    await this.db.collection(c).doc(id).update(await firestorePatch(patch as Record<string, unknown>));
   }
 
   async delete(c: CollectionName, id: string): Promise<void> {
@@ -78,13 +84,13 @@ export class FirestoreRepo implements Repo {
     await this.db.collection(c).doc(id).delete();
   }
 
-  private flush() {
+  private async flush() {
     for (const [k, ops] of this.pending) {
       const [c, id] = k.split("/");
       const ref = this.db.collection(c).doc(id);
       for (const p of ops) {
         if (p.op === "set") this.tx!.set(ref, p.doc);
-        else if (p.op === "update") this.tx!.update(ref, p.patch);
+        else if (p.op === "update") this.tx!.update(ref, await firestorePatch(p.patch));
         else this.tx!.delete(ref);
       }
     }
@@ -96,7 +102,7 @@ export class FirestoreRepo implements Repo {
     return this.db.runTransaction(async (t: Transaction) => {
       const inner = new FirestoreRepo(this.db, t);
       const r = await fn(inner);
-      inner.flush();
+      await inner.flush();
       return r;
     });
   }

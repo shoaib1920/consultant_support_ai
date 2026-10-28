@@ -6,6 +6,7 @@ import { firebaseConfigured, type CollectionName, type Repo, newId, nowISO } fro
 import type { StudentProfileInput } from "../schemas";
 import { deleteFile } from "../storage";
 import { type AuditActor, audit } from "./audit";
+import { provisionAuthUser } from "./orgs";
 import { NotFoundError } from "./bundle";
 import { refreshStudentCases } from "./eligibility";
 
@@ -113,7 +114,9 @@ export async function saveProfileViaToken(repo: Repo, token: string, input: Stud
   if (!input.consentGiven) throw new AuthError("Consent is required to submit your details.", 403);
   const sys: AuditActor = { id: "system", name: "System", role: "system", organizationId: s.organizationId };
   await repo.transaction(async (tx) => {
-    const next = applyProfile(s, input, `${input.personal.fullName} (via secure link)`, false);
+    const fresh = await tx.get<Student>("students", s.id); // don't overwrite staff edits made meanwhile
+    if (!fresh || fresh.intakeToken !== token) throw new AuthError("This intake link has already been used. Ask your consultant for a new one.", 401);
+    const next = { ...applyProfile(fresh, input, `${input.personal.fullName} (via secure link)`, false), intakeToken: undefined, intakeTokenExpiresAt: undefined }; // single use
     await tx.set("students", s.id, next);
     await audit(tx, sys, { action: "student.profile_saved_via_link", entity: "students", entityId: s.id, after: { consent: true } });
   });
@@ -129,13 +132,10 @@ export async function createPortalAccount(repo: Repo, actor: Actor, studentId: s
   let uid = newId("us_");
   let setupLink: string | undefined;
   if (firebaseConfigured()) {
+    ({ uid, setupLink } = await provisionAuthUser(repo, { email: s.personal.email, name: s.personal.fullName, organizationId: s.organizationId, role: "student" }));
     const { getAuth } = await import("firebase-admin/auth");
     const { getAdminApp } = await import("../firebase-admin");
-    const auth = getAuth(getAdminApp());
-    const u = await auth.createUser({ email: s.personal.email, displayName: s.personal.fullName });
-    uid = u.uid;
-    await auth.setCustomUserClaims(uid, { orgId: s.organizationId, role: "student", studentId });
-    setupLink = await auth.generatePasswordResetLink(s.personal.email);
+    await getAuth(getAdminApp()).setCustomUserClaims(uid, { orgId: s.organizationId, role: "student", studentId });
   }
   const now = nowISO();
   await repo.transaction(async (tx) => {

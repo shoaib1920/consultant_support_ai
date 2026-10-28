@@ -9,7 +9,7 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   serverExternalPackages: ["firebase-admin"],
-  experimental: { serverActions: { bodySizeLimit: "15mb" } },
+  experimental: { serverActions: { bodySizeLimit: "4.5mb" } },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },

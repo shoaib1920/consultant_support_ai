@@ -22,7 +22,16 @@ export function SubmitButton({ children, pendingText, ...props }: ButtonProps & 
 
 export function ResultMessage({ state }: { state: ActionResult | null }) {
   if (!state) return null;
-  if (state.ok) return state.message ? <Alert tone="green">{state.message}</Alert> : null;
+  if (state.ok) {
+    const link = typeof state.data?.setupLink === "string" ? state.data.setupLink : undefined;
+    if (!state.message && !link) return null;
+    return (
+      <Alert tone="green">
+        {state.message}
+        {link && <code className="mt-1 block break-all rounded bg-card px-2 py-1 text-[11px] select-all">{link}</code>}
+      </Alert>
+    );
+  }
   return (
     <Alert tone="red" title={<span className="inline-flex items-center gap-1.5"><ShieldAlert className="size-4" /> {state.error}</span>}>
       {state.blockers && state.blockers.length > 0 && (

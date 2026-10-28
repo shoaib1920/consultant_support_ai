@@ -164,9 +164,12 @@ export async function confirmPreflight(repo: Repo, actor: Actor, approvalId: str
   // Re-assess at execution time: the decision is based on CURRENT data, not the snapshot.
   await recomputeEligibility(repo, actor, pre.caseId);
   const res = await repo.transaction(async (tx) => {
+    // re-check inside the transaction: two simultaneous confirmations must not both execute
+    const current = await tx.get<Approval>("approvals", approvalId);
+    if (!current || current.status !== "pending_manager") throw new GateError("Pre-flight is no longer awaiting confirmation", [`Status is ${current?.status ?? "missing"}. Refresh the page.`]);
     const b = await loadCaseBundle(tx, actor.organizationId, pre.caseId);
     const now = nowISO();
-    const approved: Approval = { ...pre, managerConfirmedBy: actor.id, managerConfirmedAt: now, status: "approved", updatedAt: now };
+    const approved: Approval = { ...current, managerConfirmedBy: actor.id, managerConfirmedAt: now, status: "approved", updatedAt: now };
     const ctx = gateContext(b);
     const target = Object.entries(IRREVERSIBLE_TRANSITIONS).find(([, a]) => a === pre.action)![0] as Stage;
     const moving = nextStage(b.kase.stage) === target;

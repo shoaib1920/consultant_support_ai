@@ -33,9 +33,10 @@ import { cancelPreflight, confirmPreflight, grantOverride, signRiskAcknowledgmen
 import { attachReceipt, recordRefundablePayment, setPaymentStatus } from "../services/payments";
 import { runMatching, upsertProgramme } from "../services/programmes";
 import { createRule, updateRule, verifyRule } from "../services/rules";
+import { provisionAuthUser } from "../services/orgs";
 import { createIntakeLink, createPortalAccount, createStudent, deleteStudentData, saveProfile, saveProfileViaToken } from "../services/students";
 import { createManualTask, setTaskStatus } from "../services/tasks";
-import { seedDemo } from "../seed";
+import { DEMO_ORG, seedDemo } from "../seed";
 import { audit } from "../services/audit";
 import { newId, nowISO } from "../db";
 import type { Notification, User } from "@/domain/types";
@@ -50,7 +51,8 @@ export async function demoLoginAction(_: Prev, fd: FormData): Promise<ActionResu
   const uid = str(fd, "uid");
   const repo = await getRepo();
   const u = await repo.get<User>("users", uid);
-  if (!u || !u.active) return { ok: false, error: "Unknown user" };
+  // only the fictional demo users; real consultancies' users always sign in with Firebase Auth
+  if (!u || !u.active || u.organizationId !== DEMO_ORG) return { ok: false, error: "Unknown user" };
   await issueMockSession(uid);
   redirect(u.role === "student" ? "/portal" : "/dashboard");
 }
@@ -503,7 +505,9 @@ export async function resetDemoAction(): Promise<ActionResult> {
   const r = await run(async () => {
     const a = await requireActor("demo.reset");
     if (!demoMode()) return { ok: false, error: "Demo mode is off." };
-    if (a.organizationId !== "org_demo") return { ok: false, error: "Only the demo organisation can be reset." };
+    if (a.organizationId !== DEMO_ORG) return { ok: false, error: "Only the demo organisation can be reset." };
+    // a Firestore reset takes several minutes, longer than a web request may run; a cut-off reset leaves half the data
+    if (firebaseConfigured()) return { ok: false, error: "On Firestore, reset the demo from your computer with: npm run seed" };
     await seedDemo(await getRepo());
   });
   if (r.ok) {
@@ -519,20 +523,13 @@ export async function createUserAction(_: Prev, fd: FormData): Promise<ActionRes
     const input = UserCreateSchema.parse(formObject(fd, ["name", "email", "role"]));
     const repo = await getRepo();
     const now = nowISO();
-    let id = newId("us_");
-    if (firebaseConfigured()) {
-      const { getAuth } = await import("firebase-admin/auth");
-      const { getAdminApp } = await import("../firebase-admin");
-      const u = await getAuth(getAdminApp()).createUser({ email: input.email, displayName: input.name });
-      id = u.uid;
-      await getAuth(getAdminApp()).setCustomUserClaims(id, { orgId: a.organizationId, role: input.role });
-    }
+    const { uid: id, setupLink } = await provisionAuthUser(repo, { email: input.email, name: input.name, organizationId: a.organizationId, role: input.role });
     await repo.transaction(async (tx) => {
-      await tx.set<User>("users", id, { id, organizationId: a.organizationId, createdAt: now, updatedAt: now, ...input, active: true });
+      await tx.set<User>("users", id, { id, organizationId: a.organizationId, createdAt: now, updatedAt: now, ...input, email: input.email.trim().toLowerCase(), active: true });
       await audit(tx, a, { action: "user.created", entity: "users", entityId: id, after: input });
     });
     revalidatePath("/settings");
-    return "User created.";
+    return { ok: true, message: setupLink ? `User created. Send ${input.name} this link to set their password, then they sign in at /login:` : "User created.", data: { setupLink } };
   });
 }
 

@@ -3,7 +3,7 @@ import crypto from "node:crypto";
 function secret(): string {
   const s = process.env.SESSION_SECRET;
   if (!s || s.length < 16) {
-    if (process.env.NODE_ENV === "production" && process.env.DEMO_MODE !== "true") throw new Error("SESSION_SECRET must be set (>=16 chars) in production");
+    if (process.env.NODE_ENV === "production") throw new Error("SESSION_SECRET must be set (>=16 chars) in production");
     return "dev-only-insecure-secret-change-me";
   }
   return s;
@@ -40,7 +40,9 @@ export function verifyPayload<T>(token: string | undefined): T | null {
 }
 
 function key(): Buffer {
-  return crypto.createHash("sha256").update(process.env.STORAGE_ENCRYPTION_KEY || secret()).digest();
+  const k = process.env.STORAGE_ENCRYPTION_KEY;
+  if (!k && process.env.NODE_ENV === "production") throw new Error("STORAGE_ENCRYPTION_KEY must be set in production (and never changed, or stored files become unreadable)");
+  return crypto.createHash("sha256").update(k || secret()).digest();
 }
 
 /** AES-256-GCM: [12-byte IV][16-byte tag][ciphertext] */

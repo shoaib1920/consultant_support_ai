@@ -38,7 +38,8 @@ import { syncTasks } from "../services/tasks";
 import { materialiseProgrammes } from "./programmes.seed";
 import { materialiseRules } from "./rules.seed";
 
-export const DEMO_ORG = "org_demo";
+export { DEMO_ORG } from "./constants";
+import { DEMO_ORG } from "./constants";
 const T = todayISO();
 const d = (n: number) => addDays(T, n);
 const NOW = () => new Date().toISOString();

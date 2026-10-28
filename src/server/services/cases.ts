@@ -34,7 +34,9 @@ export async function createCase(repo: Repo, actor: Actor, input: z.infer<typeof
   assertCan(actor, "case.write");
   const student = await repo.get<Student>("students", input.studentId);
   if (!student || student.organizationId !== actor.organizationId) throw new NotFoundError("Student");
-  const programme = input.programmeId ? await repo.get<Programme>("programmes", input.programmeId) : null;
+  const found = input.programmeId ? await repo.get<Programme>("programmes", input.programmeId) : null;
+  if (input.programmeId && (!found || found.organizationId !== actor.organizationId)) throw new NotFoundError("Programme");
+  const programme = found;
   const rules = await repo.list<Rule>("rules", [["organizationId", "==", actor.organizationId]]);
   const now = nowISO();
   const kase: Case = {

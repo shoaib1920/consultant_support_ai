@@ -58,7 +58,7 @@ export default async function SettingsPage() {
       {demoMode() && can(actor.role, "demo.reset") && (
         <Card className="border-amber/50">
           <CardHeader><CardTitle>Demo mode</CardTitle><CardDescription>Deletes all demo-organisation data (students, cases, uploads, audit log) and re-creates the six scenarios.</CardDescription></CardHeader>
-          <CardContent><ActionButton variant="outline" action={resetDemoAction} confirm="Reset all demo data? Everything you changed will be lost."><RotateCcw /> One-click reset</ActionButton></CardContent>
+          <CardContent>{firebaseConfigured() ? <p className="text-sm">On Firestore the reset takes several minutes, so run it from your computer: <code className="rounded bg-muted px-1">npm run seed</code></p> : <ActionButton variant="outline" action={resetDemoAction} confirm="Reset all demo data? Everything you changed will be lost."><RotateCcw /> One-click reset</ActionButton>}</CardContent>
         </Card>
       )}
     </div>

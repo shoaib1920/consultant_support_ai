@@ -56,13 +56,14 @@ Also available:
 |---|---|---|
 | `SESSION_SECRET` | yes (prod) | HMAC key for session cookies and signed file URLs |
 | `STORAGE_ENCRYPTION_KEY` | recommended | AES-256-GCM key for uploads in local/mock storage |
-| `DEMO_MODE` | – | `true` = demo banner, demo login, auto-seed, reset. Set `false` in production. |
+| `DEMO_MODE` | – | Exactly `true` = demo banner, demo login, auto-seed. Unset (or anything else) = live mode. |
 | `ANTHROPIC_API_KEY` | no | Enables Claude. If empty, the **mock** AI is used. |
 | `ANTHROPIC_MODEL` | no | Default `claude-opus-5-5` |
 | `AI_RATE_LIMIT_PER_MINUTE` | no | Per-user AI call limit (default 10) |
 | `FIREBASE_SERVICE_ACCOUNT_JSON` | no | Service-account JSON on one line. Enables Firestore, Storage and Auth. |
 | `NEXT_PUBLIC_FIREBASE_*` | with Firebase | Client SDK config for email/password sign-in |
 | `FILE_STORAGE` | no | `firestore` (default with Firebase; uploads stored as encrypted chunks in Firestore, works on the **free Spark plan**), `firebase` (Firebase Storage, Blaze plan) or `local` (mock) |
+| `CRON_SECRET` | live | Protects the nightly re-assessment job (`/api/cron/daily`) |
 | `VISAGUARD_DATA_DIR` | no | Location of the mock datastore and uploads (default `.data`, or `/tmp/visaguard` on Vercel) |
 
 ## MOCKS (what is simulated when keys are missing)
@@ -103,7 +104,7 @@ Every Firestore record carries `organizationId`. The collections are organizatio
 - **RBAC** is enforced in server actions, REST routes and Cloud Functions. Firestore rules mirror it; the UI only hides what the server already refuses.
 - The **audit log is immutable**: append-only, SHA-256 hash-chained with key-sorted JSON, verified on the Audit page. AI entries record the model and prompt version.
 - **Prompt-injection handling:** document text is wrapped as `<untrusted_document>`, the system prompt forbids following it, output is JSON-schema constrained and Zod-validated, values are sanitised, and instruction-like text raises a "NEEDS MANUAL VERIFICATION" flag. AI output never changes state.
-- Uploads are limited by MIME type and size (10 MB) and stored encrypted. Downloads use signed 5-minute URLs plus a session and org check. Storage rules deny all direct access.
+- Uploads are limited by MIME type and size (4 MB, the Vercel request limit) and stored encrypted. Downloads use signed 5-minute URLs plus a session and org check. Storage rules deny all direct access.
 - **Consent and data rights:** consent is captured at intake and versioned. Each student has a JSON data export and a permanent deletion (owner only; requires typing the student's full name; the audit log records the deletion without personal data).
 - AI calls are rate-limited per user. Security headers are set (frame-deny, nosniff, referrer policy).
 
@@ -125,6 +126,31 @@ Then create the organisation and the first owner user (a `users/{uid}` doc with 
 
 Without Firebase, demo mode on Vercel uses `/tmp`, which is ephemeral per instance. Fine for a demo; never for real data.
 
+## Going live with real consultancies
+
+Run **two Vercel projects** from the same repo:
+
+| Project | `DEMO_MODE` | Who uses it |
+|---|---|---|
+| Demo (for outreach) | `true` | Prospects. Role-picker login, fictional data only. |
+| Live (for clients) | not set | Paying consultancies. Email/password login only. |
+
+The live project needs `SESSION_SECRET`, `STORAGE_ENCRYPTION_KEY`, `CRON_SECRET`, `FIREBASE_SERVICE_ACCOUNT_JSON`, the `NEXT_PUBLIC_FIREBASE_*` values and, for real document reading, `ANTHROPIC_API_KEY`. Without that key, uploads are marked "enter key fields manually"; they are never filled in automatically.
+
+**Add a consultancy** (from your computer, with `.env.local` pointing at Firestore):
+
+```bash
+npm run create-org -- --name "Lahore Study Consultants" --owner "Ali Khan" --email ali@example.com
+```
+
+This creates the organisation, its owner and its own rules table (all **Unverified**), and prints a password-setup link for the owner. The owner then adds staff under **Settings**, which shows a setup link for each person. Programmes start empty; the client adds their own on **Universities**.
+
+**Firebase console, once:** Authentication → Sign-in method → Email/Password **on**; Authentication → Settings → **User actions → turn off "Enable create (sign-up)"**, so only the consultancy can create accounts; Authorized domains → add the live Vercel domain.
+
+**Nightly job:** `vercel.json` schedules `/api/cron/daily` at 03:00 Pakistan time to re-assess open cases (rule expiry, deadlines). Set `CRON_SECRET` in the Vercel project for it to run.
+
+**Limits to know:** uploads are capped at 4 MB (Vercel's request limit). Vercel's free Hobby plan is for non-commercial use; move the live project to Pro once clients pay.
+
 ## Adding a new country (e.g. Ireland)
 
 1. `src/domain/types.ts`: add `"IE"` to `CountryCode`.
@@ -142,7 +168,7 @@ No other code changes are needed. Eligibility, gates, tasks, the report and the 
 
 ## Testing
 
-`npm test` runs 64 tests covering:
+`npm test` runs 72 tests covering:
 - the 28-day window: day-19 failure, the 31-day rule, coverage, carry-forward balances, deposits
 - funds formulas for all four countries, plus FX and rule scoping
 - rule staleness, and that no case is GREEN on an Unverified, Conflicting, Stale or missing rule

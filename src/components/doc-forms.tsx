@@ -17,7 +17,7 @@ export function UploadForm({ studentId, caseId, types, defaultType, compact }: {
             {types.map((t) => <option key={t} value={t}>{DOC_LABELS[t]}</option>)}
           </Select>
         </Field>
-        <Field label="File (PDF, JPG, PNG, WEBP · max 10 MB)">
+        <Field label="File (PDF, JPG, PNG, WEBP · max 4 MB)">
           <Input name="file" type="file" required accept="application/pdf,image/jpeg,image/png,image/webp,application/json,text/plain" />
         </Field>
         <SubmitButton pendingText="Uploading & reading…">Upload</SubmitButton>

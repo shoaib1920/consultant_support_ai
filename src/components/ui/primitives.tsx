@@ -62,7 +62,7 @@ export function Badge({ className, tone, ...props }: React.HTMLAttributes<HTMLSp
   return <span className={cn(badgeVariants({ tone }), className)} {...props} />;
 }
 
-export function Input({ className, ...props }: React.InputHTMLAttributes<HTMLInputElement>) {
+export function Input({ className, ...props }: React.ComponentProps<"input">) {
   return <input className={cn("flex h-9 w-full rounded-md border border-input bg-card px-3 py-1 text-sm shadow-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50", className)} {...props} />;
 }
 export function Textarea({ className, ...props }: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {

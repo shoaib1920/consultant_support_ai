@@ -160,7 +160,7 @@ export const PaymentSchema = z.object({
   type: z.enum(["consultancy_fee", "application_fee", "tuition_deposit", "visa_fee", "ihs", "insurance", "blocked_account", "attestation_fee", "courier", "other"]),
   amount: z.coerce.number().positive().max(100_000_000),
   currency: CurrencySchema,
-  refundable: z.coerce.boolean(),
+  refundable: z.boolean(), // strict: the string "false" must not become true
   payee: optStr(200),
 });
 
