@@ -1,0 +1,16 @@
+node_modules
+.next
+.data
+.data-test
+.env*.local
+.env
+*.log
+functions/lib
+next-env.d.ts
+*.tsbuildinfo
+.vercel
+
+# Firebase service-account keys - never commit
+*firebase-adminsdk*.json
+serviceAccount*.json
+.firebase

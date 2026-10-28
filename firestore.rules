@@ -1,0 +1,106 @@
+rules_version = '2';
+
+// VisaGuard Firestore security rules — least privilege, multi-tenant.
+// Custom claims (set by the server/Cloud Functions): orgId, role, studentId.
+//
+// GATE ENFORCEMENT: clients can NEVER write case stages, approvals, payments, gate events,
+// eligibility results, risk acknowledgments or the audit log. Those writes happen only through
+// the Admin SDK (Next.js server actions / Cloud Functions) after assertTransition() passes.
+// A direct Firestore call from a browser therefore cannot bypass any gate.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function org() { return request.auth.token.orgId; }
+    function role() { return request.auth.token.role; }
+    function inOrg(data) { return signedIn() && data.organizationId == org(); }
+    function isStaff() { return role() in ['owner', 'manager', 'officer', 'counsellor']; }
+    function isApprover() { return role() in ['owner', 'manager']; }
+    function isOwner() { return role() == 'owner'; }
+    function isStudentOf(data) { return role() == 'student' && data.studentId == request.auth.token.studentId; }
+    function staffRead() { return inOrg(resource.data) && isStaff(); }
+    function unchanged(fields) { return !request.resource.data.diff(resource.data).affectedKeys().hasAny(fields); }
+
+    match /organizations/{id} {
+      allow read: if signedIn() && id == org();
+      allow write: if false;
+    }
+
+    match /users/{uid} {
+      allow read: if signedIn() && (uid == request.auth.uid || (inOrg(resource.data) && isStaff()));
+      allow write: if false; // managed server-side (users.manage)
+    }
+
+    // Students: staff in org read; students read their own record but NOT internal notes (served
+    // via the portal API which strips them). Client writes limited to non-sensitive profile edits by staff.
+    match /students/{id} {
+      allow read: if staffRead();
+      allow update: if inOrg(resource.data) && role() in ['owner', 'manager', 'officer', 'counsellor']
+        && request.resource.data.organizationId == resource.data.organizationId
+        && unchanged(['consent', 'portalUserId', 'intakeToken', 'intakeTokenExpiresAt', 'deletionRequestedAt']);
+      allow create, delete: if false;
+    }
+
+    match /cases/{id} {
+      allow read: if staffRead();
+      // Staff may edit descriptive fields only. Stage, history, lights, scores and version are server-only.
+      allow update: if inOrg(resource.data) && isStaff()
+        && request.resource.data.organizationId == resource.data.organizationId
+        && unchanged(['stage', 'stageHistory', 'light', 'score', 'criticalFlags', 'ruleIssues', 'latestEligibilityId', 'dataVersion', 'offer', 'decision', 'organizationId', 'studentId']);
+      allow create, delete: if false;
+    }
+
+    match /documents/{id} {
+      allow read: if inOrg(resource.data) && (isStaff() || isStudentOf(resource.data));
+      allow write: if false; // uploads go through the server (validation, AI extraction, audit)
+    }
+
+    match /extractedFields/{id} { allow read: if staffRead(); allow write: if false; }
+    match /attestations/{id} { allow read: if staffRead(); allow write: if false; }
+
+    match /rules/{id} {
+      allow read: if inOrg(resource.data) && isStaff();
+      allow write: if false; // edits/verification via server (changelog + audit + re-assessment)
+    }
+    match /ruleChangelog/{id} { allow read: if staffRead(); allow write: if false; }
+    match /universities/{id} { allow read: if staffRead(); allow write: if false; }
+    match /programmes/{id} { allow read: if staffRead(); allow write: if false; }
+
+    // Internal risk outputs: staff only (students never see scores).
+    match /eligibilityResults/{id} { allow read: if staffRead(); allow write: if false; }
+    match /financialAnalyses/{id} { allow read: if staffRead(); allow write: if false; }
+    match /matchResults/{id} { allow read: if staffRead(); allow write: if false; }
+
+    // Gate-controlled collections: server only.
+    match /gateEvents/{id} { allow read: if staffRead(); allow write: if false; }
+    match /approvals/{id} { allow read: if inOrg(resource.data) && isStaff(); allow write: if false; }
+    match /payments/{id} { allow read: if staffRead(); allow write: if false; }
+    match /riskAcknowledgments/{id} {
+      allow read: if inOrg(resource.data) && (isStaff() || isStudentOf(resource.data));
+      allow write: if false; // signing goes through the signRiskAcknowledgment function
+    }
+
+    match /tasks/{id} {
+      allow read: if staffRead();
+      allow update: if inOrg(resource.data) && isStaff() && unchanged(['organizationId', 'caseId', 'templateKey', 'auto']);
+      allow create, delete: if false;
+    }
+
+    match /notifications/{id} {
+      allow read: if signedIn() && resource.data.userId == request.auth.uid;
+      allow update: if signedIn() && resource.data.userId == request.auth.uid && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
+      allow create, delete: if false;
+    }
+
+    // Immutable audit log.
+    match /auditLog/{id} {
+      allow read: if inOrg(resource.data) && role() in ['owner', 'manager', 'officer'];
+      allow create, update, delete: if false;
+    }
+    match /auditHeads/{id} { allow read, write: if false; }
+    match /files/{id} { allow read, write: if false; }
+
+    match /{document=**} { allow read, write: if false; }
+  }
+}

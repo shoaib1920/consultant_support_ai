@@ -1,0 +1,11 @@
+rules_version = '2';
+
+// All uploads and downloads go through the server (validation, encryption at rest by Google,
+// short-lived signed URLs). Direct client access is denied entirely.
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
