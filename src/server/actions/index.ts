@@ -77,9 +77,32 @@ export async function signupAction(_: Prev, fd: FormData): Promise<ActionResult>
     const ip = (await headers()).get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
     checkRateLimit(`signup:${ip}`, 3);
     const input = SignupSchema.parse(formObject(fd, ["consultancyName", "name", "email", "password", "agree"]));
-    await createOrganization(await getRepo(), { name: input.consultancyName, ownerName: input.name, ownerEmail: input.email, password: input.password });
+    try {
+      await createOrganization(await getRepo(), { name: input.consultancyName, ownerName: input.name, ownerEmail: input.email, password: input.password });
+    } catch (e) {
+      const msg = signupProblem(e);
+      if (!msg) throw e;
+      console.error("sign-up failed:", e);
+      return { ok: false, error: msg };
+    }
     return { ok: true };
   });
+}
+
+/** Turns Firebase/Firestore failures during sign-up into a message that says what to fix. */
+function signupProblem(e: unknown): string | undefined {
+  const code = String((e as { code?: unknown })?.code ?? (e as { errorInfo?: { code?: string } })?.errorInfo?.code ?? "");
+  const text = e instanceof Error ? e.message : String(e);
+  if (code === "auth/email-already-exists") return "An account with this email already exists. Sign in instead, or use “Forgot password?”.";
+  if (code === "auth/invalid-password") return "Choose a stronger password (at least 8 characters).";
+  if (code === "auth/invalid-email") return "Enter a valid email address.";
+  if (code === "auth/configuration-not-found" || code === "auth/operation-not-allowed" || /CONFIGURATION_NOT_FOUND|OPERATION_NOT_ALLOWED/.test(text))
+    return "Sign-up is not finished being set up: in the Firebase console, open Authentication, click Get started and turn on Email/Password.";
+  if (code.startsWith("app/") || /invalid_grant|private key|credential/i.test(text)) return "Sign-up is unavailable: the server's Firebase key (FIREBASE_SERVICE_ACCOUNT_JSON) is not valid. Paste the whole key file again in Vercel and redeploy.";
+  if (code === "5" || /NOT_FOUND/.test(text)) return "Sign-up is unavailable: the Firestore database has not been created in the Firebase console yet.";
+  if (code === "7" || /PERMISSION_DENIED/.test(text)) return "Sign-up is unavailable: the server's Firebase key does not have permission to use Firestore or Authentication.";
+  if (e instanceof Error && e.name === "ValidationError") return undefined; // already a readable message
+  return `Sign-up failed (${code || e?.constructor?.name || "error"}: ${text.slice(0, 160)}). Nothing was saved; please try again or contact us.`;
 }
 
 export async function logoutAction() {

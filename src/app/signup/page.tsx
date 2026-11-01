@@ -10,6 +10,7 @@ import { SignupForm } from "./signup-form";
 
 export const metadata = { title: "Start your free trial" };
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 const INCLUDED = [
   "Refusal-risk screening for UK, Germany, Italy and France",

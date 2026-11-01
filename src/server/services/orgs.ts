@@ -48,6 +48,17 @@ export async function provisionAuthUser(repo: Repo, input: { email: string; name
   return { uid, setupLink: await auth.generatePasswordResetLink(email) };
 }
 
+async function removeAuthUser(uid: string) {
+  if (!firebaseConfigured()) return;
+  try {
+    const { getAuth } = await import("firebase-admin/auth");
+    const { getAdminApp } = await import("../firebase-admin");
+    await getAuth(getAdminApp()).deleteUser(uid);
+  } catch (e) {
+    console.error("could not remove the login of a failed sign-up", uid, e);
+  }
+}
+
 export function orgIdFromName(name: string): string {
   const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 30) || "org";
   return `org_${slug}_${newId("").slice(-6)}`;
@@ -75,10 +86,19 @@ export async function createOrganization(repo: Repo, input: { name: string; owne
   const owner = await provisionAuthUser(repo, { email: input.ownerEmail, name: input.ownerName, organizationId: orgId, role: "owner", password: input.password });
   const plan = input.password ? { plan: "trial" as const, trialEndsAt: trialEndsAt(new Date(now)) } : { plan: "active" as const };
   const org: Organization = { id: orgId, name: input.name, createdAt: now, updatedAt: now, demo: false, defaultCurrency: "PKR", ...plan };
-  await repo.set("organizations", orgId, { ...org, organizationId: orgId });
-  await repo.set<User>("users", owner.uid, { id: owner.uid, organizationId: orgId, createdAt: now, updatedAt: now, name: input.ownerName, email: input.ownerEmail.trim().toLowerCase(), role: "owner", active: true });
   const rules = rulesForNewOrg(orgId);
-  for (const r of rules) await repo.set("rules", r.id, r);
-  await repo.transaction((tx) => audit(tx, SYSTEM(orgId), { action: "organization.created", entity: "organizations", entityId: orgId, after: { name: input.name, owner: input.ownerEmail, rules: rules.length, ...plan } }));
+  try {
+    await repo.set("organizations", orgId, { ...org, organizationId: orgId });
+    await repo.set<User>("users", owner.uid, { id: owner.uid, organizationId: orgId, createdAt: now, updatedAt: now, name: input.ownerName, email: input.ownerEmail.trim().toLowerCase(), role: "owner", active: true });
+    // in parallel batches: one round trip per rule in sequence is slow enough to time out a web request
+    for (let i = 0; i < rules.length; i += 20) await Promise.all(rules.slice(i, i + 20).map((r) => repo.set("rules", r.id, r)));
+    await repo.transaction((tx) => audit(tx, SYSTEM(orgId), { action: "organization.created", entity: "organizations", entityId: orgId, after: { name: input.name, owner: input.ownerEmail, rules: rules.length, ...plan } }));
+  } catch (e) {
+    // a half-made sign-up must not leave its login behind, or every retry with that email says "already exists"
+    await removeAuthUser(owner.uid);
+    await repo.delete("users", owner.uid).catch(() => undefined);
+    await repo.delete("organizations", orgId).catch(() => undefined);
+    throw e;
+  }
   return { orgId, ownerId: owner.uid, setupLink: owner.setupLink, rules: rules.length, ...plan };
 }
