@@ -13,6 +13,7 @@ beforeAll(async () => {
   await env.withSecurityRulesDisabled(async (ctx) => {
     const db = ctx.firestore();
     await setDoc(doc(db, "cases/c1"), { organizationId: ORG, studentId: "s1", stage: "Docs Verified", universityName: "X", light: "RED" });
+    await setDoc(doc(db, "students/s1"), { organizationId: ORG, fullName: "S" });
     await setDoc(doc(db, "auditLog/a1"), { organizationId: ORG, action: "x" });
     await setDoc(doc(db, "eligibilityResults/e1"), { organizationId: ORG, light: "RED" });
   });
@@ -26,8 +27,10 @@ describe("firestore.rules", () => {
     await assertFails(updateDoc(doc(as("owner"), "cases/c1"), { stage: "Payment Authorized" }));
     await assertFails(updateDoc(doc(as("manager"), "cases/c1"), { light: "GREEN" }));
   });
-  it("staff can edit descriptive case fields", async () => {
-    await assertSucceeds(updateDoc(doc(as("officer"), "cases/c1"), { universityName: "Y" }));
+  it("staff cannot edit any case or student field from the client; edits go through the server and are re-assessed", async () => {
+    await assertFails(updateDoc(doc(as("officer"), "cases/c1"), { universityName: "Y" }));
+    await assertFails(updateDoc(doc(as("owner"), "cases/c1"), { minCGPA4: 2.0 }));
+    await assertFails(updateDoc(doc(as("officer"), "students/s1"), { fullName: "Changed" }));
   });
   it("nobody can write payments, approvals or gate events from the client", async () => {
     await assertFails(setDoc(doc(as("owner"), "payments/p1"), { organizationId: ORG, refundable: false, amount: 1 }));

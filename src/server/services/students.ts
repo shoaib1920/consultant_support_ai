@@ -183,4 +183,12 @@ export async function deleteStudentData(repo: Repo, actor: Actor, studentId: str
     // Audit records the deletion without personal data. Earlier audit entries are retained (immutable).
     await audit(tx, actor, { action: "student.deleted", entity: "students", entityId: studentId, after: { cases: cases.length, documents: docs.length } });
   });
+  // the portal login carries org/student claims; remove it too, or it outlives the deleted record
+  if (s.portalUserId && firebaseConfigured()) {
+    const { getAuth } = await import("firebase-admin/auth");
+    const { getAdminApp } = await import("../firebase-admin");
+    await getAuth(getAdminApp()).deleteUser(s.portalUserId).catch((e: { code?: string }) => {
+      if (e.code !== "auth/user-not-found") console.error("could not remove the portal login of a deleted student", e);
+    });
+  }
 }

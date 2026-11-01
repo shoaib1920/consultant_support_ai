@@ -557,6 +557,23 @@ export async function resetDemoAction(): Promise<ActionResult> {
   return r;
 }
 
+/**
+ * Mirrors activation onto the Firebase login. Deactivating disables it and revokes its tokens, so the
+ * person loses direct Firestore access (their token carries org/role claims), not just the app.
+ */
+async function setAuthLoginEnabled(uid: string, enabled: boolean) {
+  if (!firebaseConfigured()) return;
+  const { getAuth } = await import("firebase-admin/auth");
+  const { getAdminApp } = await import("../firebase-admin");
+  const auth = getAuth(getAdminApp());
+  try {
+    await auth.updateUser(uid, { disabled: !enabled });
+    if (!enabled) await auth.revokeRefreshTokens(uid);
+  } catch (e) {
+    if ((e as { code?: string }).code !== "auth/user-not-found") throw e; // demo users have no Firebase login
+  }
+}
+
 export async function createUserAction(_: Prev, fd: FormData): Promise<ActionResult> {
   return run(async () => {
     const a = await requireActor("users.manage");
@@ -578,12 +595,15 @@ export async function toggleUserAction(userId: string): Promise<ActionResult> {
     const a = await requireActor("users.manage");
     if (userId === a.id) return { ok: false, error: "You cannot deactivate yourself." };
     const repo = await getRepo();
+    let nowActive = false;
     await repo.transaction(async (tx) => {
       const u = await tx.get<User>("users", userId);
       if (!u || u.organizationId !== a.organizationId) throw new Error("not found");
-      await tx.update<User>("users", userId, { active: !u.active, updatedAt: nowISO() });
+      nowActive = !u.active;
+      await tx.update<User>("users", userId, { active: nowActive, updatedAt: nowISO() });
       await audit(tx, a, { action: u.active ? "user.deactivated" : "user.activated", entity: "users", entityId: userId });
     });
+    await setAuthLoginEnabled(userId, nowActive);
     revalidatePath("/settings");
   });
 }

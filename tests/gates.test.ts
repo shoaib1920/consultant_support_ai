@@ -102,10 +102,9 @@ describe("no bypass", () => {
 
   it("Firestore rules deny client writes to every gated collection and to case stages", () => {
     const rules = fs.readFileSync("firestore.rules", "utf8");
-    for (const c of ["gateEvents", "approvals", "payments", "riskAcknowledgments", "eligibilityResults", "auditLog", "rules"]) {
+    for (const c of ["gateEvents", "approvals", "payments", "riskAcknowledgments", "eligibilityResults", "auditLog", "rules", "cases", "students", "tasks"]) {
       expect(rules).toMatch(new RegExp(`match /${c}/\\{id\\}[^}]*allow (create, update, delete|write): if false`, "s"));
     }
-    expect(rules).toMatch(/unchanged\(\['stage', 'stageHistory'/);
   });
 });
 
