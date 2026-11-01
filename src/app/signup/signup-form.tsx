@@ -8,7 +8,7 @@ import { ShieldAlert } from "lucide-react";
 import { Alert, Button, Field, Input } from "@/components/ui/primitives";
 import { TRIAL_DAYS } from "@/domain/trial";
 import { firebaseSessionAction, signupAction } from "@/server/actions";
-import { app } from "../login/firebase-login";
+import { app, reloadIfStaleDeployment } from "../login/firebase-login";
 
 export function SignupForm() {
   const [error, setError] = React.useState<{ title: string; items?: string[] } | null>(null);
@@ -31,6 +31,7 @@ export function SignupForm() {
           if (!s.ok) throw new Error(s.error);
           router.push("/dashboard");
         } catch (err) {
+          if (reloadIfStaleDeployment(err, (title) => setError({ title }))) return;
           setError({ title: err instanceof Error && !(err as { code?: string }).code ? err.message : "Your account was created, but signing in failed. Go to the sign-in page and sign in with the same email and password." });
         } finally {
           setPending(false);

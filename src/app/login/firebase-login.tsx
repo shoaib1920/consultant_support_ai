@@ -20,6 +20,17 @@ export function app() {
   );
 }
 
+/**
+ * A page opened before a new deployment calls server actions that no longer exist (their ids change
+ * with every build). Nothing ran on the server, so reloading to get the current page is safe.
+ */
+export function reloadIfStaleDeployment(err: unknown, show: (msg: string) => void): boolean {
+  if (!(err instanceof Error) || !/Server Action .* was not found|failed-to-find-server-action/i.test(err.message)) return false;
+  show("VisaGuard was just updated. Reloading the page, then please try again…");
+  setTimeout(() => window.location.reload(), 1500);
+  return true;
+}
+
 export function FirebaseLogin() {
   const [error, setError] = React.useState<string | null>(null);
   const [info, setInfo] = React.useState<string | null>(null);
@@ -40,6 +51,7 @@ export function FirebaseLogin() {
           if (!r.ok) throw new Error(r.error);
           router.push("/");
         } catch (err) {
+          if (reloadIfStaleDeployment(err, setInfo)) return;
           const code = (err as { code?: string }).code ?? "";
           setError(/invalid-credential|wrong-password|user-not-found|invalid-email/.test(code) ? "Email or password is incorrect." : code.includes("too-many-requests") ? "Too many attempts. Wait a few minutes or reset your password." : err instanceof Error && !code ? err.message : "Sign-in failed. Check your connection and try again.");
         } finally {
