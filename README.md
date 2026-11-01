@@ -28,7 +28,7 @@ npm run dev                    # http://localhost:3000
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run seed` | Re-create demo data (memory store, or Firestore if configured) |
 
-Node ≥ 20.9. **Use Node 22 for Firebase mode** (`firebase-admin` 14 requires it).
+**Node 22** (pinned in `package.json`; `firebase-admin` 14 does not load on Node 20).
 
 ### Demo walkthrough (6 scenarios)
 
