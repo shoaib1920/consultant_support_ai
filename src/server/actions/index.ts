@@ -3,6 +3,7 @@
 // All server actions. Each one: authenticate -> authorise -> validate (zod) -> service -> revalidate.
 
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import type { IrreversibleAction, Rule, Stage } from "@/domain/types";
@@ -23,6 +24,7 @@ import {
   RuleUpdateSchema,
   StatementSchema,
   StudentProfileSchema,
+  SignupSchema,
   UserCreateSchema,
 } from "../schemas";
 import { createCase, setCasDetails, setCountryCheck, updateAttestationStep, updateCase } from "../services/cases";
@@ -33,7 +35,7 @@ import { cancelPreflight, confirmPreflight, grantOverride, signRiskAcknowledgmen
 import { attachReceipt, recordRefundablePayment, setPaymentStatus } from "../services/payments";
 import { runMatching, upsertProgramme } from "../services/programmes";
 import { createRule, updateRule, verifyRule } from "../services/rules";
-import { provisionAuthUser } from "../services/orgs";
+import { createOrganization, provisionAuthUser } from "../services/orgs";
 import { createIntakeLink, createPortalAccount, createStudent, deleteStudentData, saveProfile, saveProfileViaToken } from "../services/students";
 import { createManualTask, setTaskStatus } from "../services/tasks";
 import { DEMO_ORG, seedDemo } from "../seed";
@@ -61,6 +63,21 @@ export async function firebaseSessionAction(idToken: string): Promise<ActionResu
   return run(async () => {
     if (!firebaseConfigured()) return { ok: false, error: "Firebase is not configured." };
     await issueFirebaseSession(idToken);
+    return { ok: true };
+  });
+}
+
+/**
+ * Self-service sign-up: a new consultancy, its owner login and its own rules table, on a 14-day free trial.
+ * Creates the account only; the browser then signs in with the same email and password.
+ */
+export async function signupAction(_: Prev, fd: FormData): Promise<ActionResult> {
+  return run(async () => {
+    if (!firebaseConfigured() || !process.env.NEXT_PUBLIC_FIREBASE_API_KEY) return { ok: false, error: "Sign-up is not available on this deployment." };
+    const ip = (await headers()).get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+    checkRateLimit(`signup:${ip}`, 3);
+    const input = SignupSchema.parse(formObject(fd, ["consultancyName", "name", "email", "password", "agree"]));
+    await createOrganization(await getRepo(), { name: input.consultancyName, ownerName: input.name, ownerEmail: input.email, password: input.password });
     return { ok: true };
   });
 }

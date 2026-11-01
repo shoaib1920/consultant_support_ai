@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { Bell, BookOpenCheck, ClipboardList, FileClock, Gauge, GraduationCap, LogOut, Scale, ShieldCheck, Users, Wallet, Settings, CheckSquare, FlaskConical } from "lucide-react";
+import { Bell, BookOpenCheck, ClipboardList, FileClock, Gauge, GraduationCap, LogOut, Scale, ShieldCheck, Users, Wallet, Settings, CheckSquare, FlaskConical, Clock } from "lucide-react";
 import { can, ROLE_LABELS, type Permission } from "@/server/auth/rbac";
 import type { Actor } from "@/server/auth/session";
+import { TRIAL_DAYS } from "@/domain/trial";
 import { logoutAction } from "@/server/actions";
 import { MobileNavToggle, ThemeToggle } from "./client-bits";
 import { Badge, Button } from "./ui/primitives";
@@ -42,6 +43,17 @@ export function DemoBanner() {
   );
 }
 
+export function TrialBanner({ daysLeft }: { daysLeft: number }) {
+  return (
+    <div className="no-print flex items-center justify-center gap-2 bg-green-soft px-3 py-1.5 text-center text-xs text-green">
+      <Clock className="size-3.5" />
+      <span>
+        <strong>Free trial</strong>: {daysLeft} {daysLeft === 1 ? "day" : "days"} left of your {TRIAL_DAYS}-day trial. Contact us to upgrade and keep your data.
+      </span>
+    </div>
+  );
+}
+
 export function Disclaimer() {
   return (
     <footer className="no-print mt-10 border-t px-4 py-4 text-[11px] leading-relaxed text-muted-foreground">
@@ -50,10 +62,11 @@ export function Disclaimer() {
   );
 }
 
-export function AppShell({ actor, demo, unread, children }: { actor: Actor; demo: boolean; unread: number; children: React.ReactNode }) {
+export function AppShell({ actor, demo, unread, trialDaysLeft, children }: { actor: Actor; demo: boolean; unread: number; trialDaysLeft?: number; children: React.ReactNode }) {
   return (
     <div className="min-h-screen">
       {demo && <DemoBanner />}
+      {trialDaysLeft !== undefined && <TrialBanner daysLeft={trialDaysLeft} />}
       <div className="flex">
         <aside className="no-print sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-r bg-card p-3 lg:flex">
           <Link href="/dashboard" className="mb-4 flex items-center gap-2 px-2 py-1">

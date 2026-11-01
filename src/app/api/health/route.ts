@@ -1,7 +1,18 @@
 import { NextResponse } from "next/server";
 import { aiConfigured } from "@/server/ai";
+import { configProblems, isDemoMode } from "@/server/config-check";
 import { firebaseConfigured } from "@/server/db";
 
+export const dynamic = "force-dynamic";
+
 export function GET() {
-  return NextResponse.json({ ok: true, datastore: firebaseConfigured() ? "firestore" : "mock", ai: aiConfigured() ? "claude" : "mock" });
+  const problems = configProblems();
+  return NextResponse.json({
+    ok: true,
+    mode: isDemoMode() ? "demo" : "live",
+    datastore: firebaseConfigured() ? "firestore" : "mock",
+    ai: aiConfigured() ? "claude" : isDemoMode() ? "mock" : "off (staff enter document fields by hand)",
+    nightlyJob: process.env.CRON_SECRET ? "configured" : "CRON_SECRET not set",
+    missingSettings: problems,
+  });
 }

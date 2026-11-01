@@ -1,11 +1,14 @@
 import { ShieldCheck } from "lucide-react";
+import Link from "next/link";
 import type { User } from "@/domain/types";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { Disclaimer } from "@/components/app-shell";
-import { Badge, Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/primitives";
+import { Badge, buttonVariants, Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/primitives";
 import { demoLoginAction } from "@/server/actions";
 import { ROLE_LABELS } from "@/server/auth/rbac";
 import { demoMode } from "@/server/auth/session";
+import { configProblems } from "@/server/config-check";
+import { TRIAL_DAYS } from "@/domain/trial";
 import { firebaseConfigured, getRepo } from "@/server/db";
 import { ensureSeeded } from "@/server/seed";
 import { FirebaseLogin } from "./firebase-login";
@@ -21,6 +24,7 @@ export default async function LoginPage() {
     await ensureSeeded();
     users = (await (await getRepo()).list<User>("users", [["organizationId", "==", "org_demo"]])).filter((u) => u.active);
   }
+  const signupHref = firebaseConfigured() && process.env.NEXT_PUBLIC_FIREBASE_API_KEY ? "/signup" : process.env.SIGNUP_URL;
   const staff = users.filter((u) => u.role !== "student");
   const students = users.filter((u) => u.role === "student");
   return (
@@ -41,6 +45,21 @@ export default async function LoginPage() {
             </CardHeader>
             <CardContent>
               <FirebaseLogin />
+            </CardContent>
+          </Card>
+        )}
+        {signupHref && (
+          <Card className="border-green/30 bg-green-soft/40">
+            <CardContent className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between pt-4">
+              <div>
+                <div className="flex items-center gap-2 font-medium">
+                  New consultancy? <Badge tone="green">{TRIAL_DAYS}-day free trial</Badge>
+                </div>
+                <p className="text-sm text-muted-foreground">Create your workspace in a minute. Full access, no card required.</p>
+              </div>
+              <Link href={signupHref} className={buttonVariants({ className: "shrink-0" })}>
+                Start free trial
+              </Link>
             </CardContent>
           </Card>
         )}
@@ -93,7 +112,18 @@ export default async function LoginPage() {
             </CardContent>
           </Card>
         )}
-        {!demo && !firebaseConfigured() && <p className="text-sm text-red">No authentication provider configured. Set Firebase env vars or DEMO_MODE=true.</p>}
+        {!demo && !(firebaseConfigured() && process.env.NEXT_PUBLIC_FIREBASE_API_KEY) && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-red">Sign-in is not set up on this deployment</CardTitle>
+              <CardDescription>Add these settings in Vercel → Project → Settings → Environment Variables (for Production), then redeploy. Variables only take effect on a new deployment.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ul className="list-disc space-y-1 pl-5 text-sm">{configProblems().map((p) => <li key={p}>{p}</li>)}</ul>
+              <p className="mt-3 text-xs text-muted-foreground">For a demo deployment instead, set DEMO_MODE to true.</p>
+            </CardContent>
+          </Card>
+        )}
       </div>
       <Disclaimer />
     </div>

@@ -6,9 +6,11 @@
 
 import { cookies } from "next/headers";
 import { firebaseConfigured, getRepo } from "../db";
+import { isDemoMode } from "../config-check";
 import { signPayload, verifyPayload } from "../crypto";
 import { AuthError, can, type Permission } from "./rbac";
-import type { Role, User } from "@/domain/types";
+import { TRIAL_ENDED_MESSAGE, trialInfo } from "@/domain/trial";
+import type { Organization, Role, User } from "@/domain/types";
 
 export const SESSION_COOKIE = "vg_session";
 const SESSION_DAYS = 5;
@@ -48,6 +50,8 @@ export async function actorFromToken(token: string | undefined): Promise<Actor |
   const repo = await getRepo();
   const user = await repo.get<User>("users", uid);
   if (!user || !user.active) return null;
+  // an ended free trial locks the whole organisation (staff and students); its data is kept
+  if (trialInfo(await repo.get<Organization>("organizations", user.organizationId)).expired) return null;
   return toActor(user);
 }
 
@@ -89,6 +93,7 @@ export async function issueFirebaseSession(idToken: string) {
   const user = await (await getRepo()).get<User>("users", uid);
   if (!user) throw new AuthError("This login is not linked to any consultancy yet. Ask your administrator to add you.", 403);
   if (!user.active) throw new AuthError("Your account has been deactivated. Contact your administrator.", 403);
+  if (trialInfo(await (await getRepo()).get<Organization>("organizations", user.organizationId)).expired) throw new AuthError(TRIAL_ENDED_MESSAGE, 403);
   const expiresIn = SESSION_DAYS * 86_400_000;
   const cookie = await getAuth(getAdminApp()).createSessionCookie(idToken, { expiresIn });
   const jar = await cookies();
@@ -114,5 +119,5 @@ export async function clearSession() {
 
 /** Demo mode is opt-in: only DEMO_MODE=true enables demo login, demo banner and auto-seeding. */
 export function demoMode(): boolean {
-  return process.env.DEMO_MODE === "true";
+  return isDemoMode();
 }

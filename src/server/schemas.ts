@@ -190,3 +190,11 @@ export const UserCreateSchema = z.object({
   email: z.string().trim().email(),
   role: z.enum(["owner", "manager", "officer", "counsellor"]),
 });
+
+export const SignupSchema = z.object({
+  consultancyName: z.string().trim().min(2, "Enter your consultancy's name").max(120),
+  name: z.string().trim().min(2, "Enter your full name").max(120),
+  email: z.string().trim().toLowerCase().email("Enter a valid email"),
+  password: z.string().min(8, "Use at least 8 characters").max(128),
+  agree: z.literal(true, { error: "Please accept the terms to continue" }),
+});

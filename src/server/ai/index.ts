@@ -1,4 +1,5 @@
 import { AIError, ClaudeProvider } from "./claude";
+import { isDemoMode } from "../config-check";
 import { MockProvider } from "./mock";
 import type { AIProvider, ExtractionOutput, ExtractionRequest, NarrativeRequest } from "./types";
 
@@ -31,7 +32,7 @@ class ManualEntryProvider implements AIProvider {
 export function getAI(): AIProvider {
   if (g.__vgAI) return g.__vgAI;
   if (aiConfigured()) return (g.__vgAI = new ClaudeProvider());
-  return (g.__vgAI = process.env.DEMO_MODE === "true" || process.env.NODE_ENV !== "production" ? new MockProvider() : new ManualEntryProvider());
+  return (g.__vgAI = isDemoMode() || process.env.NODE_ENV !== "production" ? new MockProvider() : new ManualEntryProvider());
 }
 
 export function setAI(p: AIProvider) {

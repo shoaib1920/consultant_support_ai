@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import { Alert, Button, Field, Input } from "@/components/ui/primitives";
 import { firebaseSessionAction } from "@/server/actions";
 
-function app() {
+export function app() {
   return (
     getApps()[0] ??
     initializeApp({

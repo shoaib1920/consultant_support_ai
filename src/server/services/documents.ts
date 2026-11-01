@@ -50,6 +50,11 @@ export async function uploadDocument(repo: Repo, actor: Actor, input: UploadInpu
   if (input.bytes.length === 0 || input.bytes.length > MAX_UPLOAD_BYTES) throw new ValidationError("File must be under 4 MB. For a large PDF, compress it or upload pages as separate images.");
   const student = await repo.get<Student>("students", input.studentId);
   if (!student || student.organizationId !== actor.organizationId) throw new NotFoundError("Student");
+  if (input.caseId) {
+    // the case must be this student's, in this organisation; otherwise the upload would attach to someone else's file
+    const kase = await repo.get<Case>("cases", input.caseId);
+    if (!kase || kase.organizationId !== actor.organizationId || kase.studentId !== input.studentId) throw new NotFoundError("Case");
+  }
   const id = newId("dc_");
   const safeName = input.fileName.replace(/[^\w.\- ]+/g, "_").slice(0, 120);
   const storagePath = `orgs/${actor.organizationId}/students/${input.studentId}/${id}/${safeName}`;

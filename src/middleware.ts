@@ -4,7 +4,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 // API routes authenticate themselves (cookie or Bearer token) and return 401/403 JSON.
-const PUBLIC = ["/login", "/intake", "/api"];
+const PUBLIC = ["/login", "/signup", "/intake", "/api"];
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;

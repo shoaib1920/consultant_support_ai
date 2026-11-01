@@ -23,7 +23,7 @@ npm run dev                    # http://localhost:3000
 | Script | What it does |
 |---|---|
 | `npm run dev` / `build` / `start` | Next.js |
-| `npm test` | 64 unit/integration tests (Vitest) |
+| `npm test` | 79 unit/integration tests (Vitest) |
 | `npm run test:rules` | Firestore security-rules tests against the emulator (needs `firebase-tools` + Java) |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run seed` | Re-create demo data (memory store, or Firestore if configured) |
@@ -64,6 +64,7 @@ Also available:
 | `NEXT_PUBLIC_FIREBASE_*` | with Firebase | Client SDK config for email/password sign-in |
 | `FILE_STORAGE` | no | `firestore` (default with Firebase; uploads stored as encrypted chunks in Firestore, works on the **free Spark plan**), `firebase` (Firebase Storage, Blaze plan) or `local` (mock) |
 | `CRON_SECRET` | live | Protects the nightly re-assessment job (`/api/cron/daily`) |
+| `SIGNUP_URL` | no | On a deployment without Firebase sign-in (e.g. the demo), "Start free trial" links here, normally `https://<live-app>/signup` |
 | `VISAGUARD_DATA_DIR` | no | Location of the mock datastore and uploads (default `.data`, or `/tmp/visaguard` on Vercel) |
 
 ## MOCKS (what is simulated when keys are missing)
@@ -122,7 +123,7 @@ firebase use <project>
 firebase deploy --only firestore:rules,firestore:indexes,storage
 cd functions && npm install && npm run build && cd .. && firebase deploy --only functions
 ```
-Then create the organisation and the first owner user (a `users/{uid}` doc with `role: "owner"`). The `syncUserClaims` function sets the custom claims that the rules rely on.
+Then create the organisation and the first owner user (or let them sign up at `/signup`) (a `users/{uid}` doc with `role: "owner"`). The `syncUserClaims` function sets the custom claims that the rules rely on.
 
 Without Firebase, demo mode on Vercel uses `/tmp`, which is ephemeral per instance. Fine for a demo; never for real data.
 
@@ -137,15 +138,17 @@ Run **two Vercel projects** from the same repo:
 
 The live project needs `SESSION_SECRET`, `STORAGE_ENCRYPTION_KEY`, `CRON_SECRET`, `FIREBASE_SERVICE_ACCOUNT_JSON`, the `NEXT_PUBLIC_FIREBASE_*` values and, for real document reading, `ANTHROPIC_API_KEY`. Without that key, uploads are marked "enter key fields manually"; they are never filled in automatically.
 
-**Add a consultancy** (from your computer, with `.env.local` pointing at Firestore):
+**Self-service sign-up (14-day free trial):** a consultancy can create its own workspace at `/signup` (linked from the login page). This creates the organisation, its owner login with the password they choose, and its own rules table (all **Unverified**). The workspace is on a **14-day free trial**: staff see the days left in a banner, and when the trial ends nobody in that organisation can sign in (existing sessions stop working too) until you upgrade it. The data is kept. To upgrade, set `plan` to `"active"` on its `organizations/{id}` document in the Firebase console. On the demo deployment, set `SIGNUP_URL` to the live app's `/signup` so prospects land there.
+
+**Add a consultancy yourself** (no trial; from your computer, with `.env.local` pointing at Firestore):
 
 ```bash
 npm run create-org -- --name "Lahore Study Consultants" --owner "Ali Khan" --email ali@example.com
 ```
 
-This creates the organisation, its owner and its own rules table (all **Unverified**), and prints a password-setup link for the owner. The owner then adds staff under **Settings**, which shows a setup link for each person. Programmes start empty; the client adds their own on **Universities**.
+This creates an **active** (paid, no trial) organisation, its owner and its own rules table (all **Unverified**), and prints a password-setup link for the owner. The owner then adds staff under **Settings**, which shows a setup link for each person. Programmes start empty; the client adds their own on **Universities**.
 
-**Firebase console, once:** Authentication → Sign-in method → Email/Password **on**; Authentication → Settings → **User actions → turn off "Enable create (sign-up)"**, so only the consultancy can create accounts; Authorized domains → add the live Vercel domain.
+**Firebase console, once:** Authentication → Sign-in method → Email/Password **on**; Authentication → Settings → **User actions → turn off "Enable create (sign-up)"**, so accounts can only be created by the server (the `/signup` page and staff invitations still work, because they use the Admin SDK); Authorized domains → add the live Vercel domain.
 
 **Nightly job:** `vercel.json` schedules `/api/cron/daily` at 03:00 Pakistan time to re-assess open cases (rule expiry, deadlines). Set `CRON_SECRET` in the Vercel project for it to run.
 
@@ -168,7 +171,7 @@ No other code changes are needed. Eligibility, gates, tasks, the report and the 
 
 ## Testing
 
-`npm test` runs 72 tests covering:
+`npm test` runs 79 tests covering:
 - the 28-day window: day-19 failure, the 31-day rule, coverage, carry-forward balances, deposits
 - funds formulas for all four countries, plus FX and rule scoping
 - rule staleness, and that no case is GREEN on an Unverified, Conflicting, Stale or missing rule
@@ -180,12 +183,13 @@ No other code changes are needed. Eligibility, gates, tasks, the report and the 
   - the override and acknowledgment lifecycle
   - a static check that the Firestore rules deny gated writes
 - audit-chain tamper detection, transaction rollback, prompt-injection handling, rate limiting
+- the 14-day free trial: countdown, sign-up validation, and sessions stopping when the trial ends
 
 `npm run test:rules` additionally runs the rules against the emulator (not run in CI by default).
 
 ## Production hardening still to do
 
-- The AI rate limiter is in-process. Back it with Firestore or Redis for multi-instance deployments.
+- The AI and sign-up rate limiters are in-process. Back it with Firestore or Redis for multi-instance deployments.
 - Cloud Functions are written against firebase-functions v2 but **were not deployed or executed** in this build.
 - The Firestore-rules emulator test was not run here (no Java or emulator). The static rules check and the service-level tests did run.
 - Claude extraction was not exercised against the live API in this build (no key). The adapter follows the SDK's documented types and type-checks.

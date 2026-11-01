@@ -1,5 +1,5 @@
 import { computeDeadlines, generateTasks } from "@/domain/tasks";
-import type { Notification, Task } from "@/domain/types";
+import type { Case, Notification, Task } from "@/domain/types";
 import { sha256 } from "../crypto";
 import { type Repo, nowISO } from "../db";
 import type { Actor } from "../auth/session";
@@ -66,6 +66,10 @@ export async function setTaskStatus(repo: Repo, actor: Actor, taskId: string, do
 }
 
 export async function createManualTask(repo: Repo, actor: Actor, input: { caseId?: string; title: string; detail?: string; dueDate?: string; assigneeId?: string }) {
+  if (input.caseId) {
+    const c = await repo.get<Case>("cases", input.caseId);
+    if (!c || c.organizationId !== actor.organizationId) throw new NotFoundError("Case");
+  }
   const now = nowISO();
   const id = `tk_m_${sha256(now + input.title + actor.id).slice(0, 16)}`;
   await repo.transaction(async (tx) => {

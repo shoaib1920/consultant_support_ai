@@ -27,6 +27,9 @@ export interface Organization {
   updatedAt: string;
   demo: boolean;
   defaultCurrency: Currency;
+  /** "trial" = self-service sign-up, usable until trialEndsAt. Missing = active (onboarded by us, or the demo). */
+  plan?: "trial" | "active";
+  trialEndsAt?: string;
 }
 
 export interface User extends Base {

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/primitives";
 import { logoutAction } from "@/server/actions";
 import { demoMode } from "@/server/auth/session";
 import { studentPage } from "@/server/page-guard";
+import { DEMO_ORG } from "@/server/seed";
 
 export const dynamic = "force-dynamic";
 
@@ -13,7 +14,7 @@ export default async function PortalLayout({ children }: { children: React.React
   const actor = await studentPage();
   return (
     <div className="min-h-screen">
-      {demoMode() && <DemoBanner />}
+      {demoMode() && actor.organizationId === DEMO_ORG && <DemoBanner />}
       <header className="flex h-12 items-center gap-2 border-b px-4">
         <Link href="/portal" className="flex items-center gap-1.5 font-semibold"><ShieldCheck className="size-4 text-primary" /> Student portal</Link>
         <span className="ml-auto text-sm text-muted-foreground">{actor.name}</span>
