@@ -2,13 +2,19 @@
 // which is why every write path in src/server/services enforces roles and gates itself).
 
 import type { Firestore, Transaction, Query, QueryDocumentSnapshot } from "firebase-admin/firestore";
-import { type CollectionName, type ListOptions, type Repo, type Where } from "./repo";
+import { type CollectionName, type ListOptions, type Repo, type Where, sortAndLimit } from "./repo";
 
-function applyQuery(q: Query, where: Where[] = [], opts?: ListOptions): Query {
+/**
+ * Filters combined with orderBy need a composite index in Firestore, and a missing index fails the
+ * whole page in production. Every list here is scoped to one organisation, so filtered queries run
+ * on filters alone (no composite index needed for equality filters) and are sorted and limited here.
+ */
+export function applyQuery(q: Query, where: Where[] = [], opts?: ListOptions): { q: Query; local?: ListOptions } {
   for (const [f, op, v] of where) q = q.where(f, op, v);
+  if (where.length && (opts?.orderBy || opts?.limit)) return { q, local: opts };
   if (opts?.orderBy) q = q.orderBy(opts.orderBy, opts.desc ? "desc" : "asc");
   if (opts?.limit) q = q.limit(opts.limit);
-  return q;
+  return { q };
 }
 
 function clean<T>(doc: T): T {
@@ -63,10 +69,11 @@ export class FirestoreRepo implements Repo {
   }
 
   async list<T>(c: CollectionName, where?: Where[], opts?: ListOptions): Promise<T[]> {
-    const q = applyQuery(this.db.collection(c), where, opts);
+    const { q, local } = applyQuery(this.db.collection(c), where, opts);
     const snap = this.tx ? await this.tx.get(q) : await q.get();
     // always expose the real document id (some internal docs, e.g. auditHeads, have no id field)
-    return snap.docs.map((d: QueryDocumentSnapshot) => (this.tx ? this.overlay(c, d.id, { id: d.id, ...d.data() }) : { id: d.id, ...d.data() }) as T).filter(Boolean);
+    const rows = snap.docs.map((d: QueryDocumentSnapshot) => (this.tx ? this.overlay(c, d.id, { id: d.id, ...d.data() }) : { id: d.id, ...d.data() }) as T).filter(Boolean);
+    return local ? sortAndLimit(rows, local) : rows;
   }
 
   async set<T extends object>(c: CollectionName, id: string, doc: T): Promise<void> {

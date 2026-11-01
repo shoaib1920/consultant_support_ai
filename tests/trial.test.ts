@@ -12,6 +12,8 @@ import { seedDemo } from "@/server/seed/seed";
 import { uploadDocument } from "@/server/services/documents";
 import { createOrganization } from "@/server/services/orgs";
 import { createManualTask } from "@/server/services/tasks";
+import { ownerDashboard } from "@/server/services/dashboard";
+import { applyQuery } from "@/server/db/firestore";
 
 const NOW = new Date("2026-11-01T12:00:00Z");
 
@@ -62,6 +64,28 @@ describe("trial enforcement", () => {
     await repo.update<Organization>("organizations", t.orgId, { trialEndsAt: new Date(Date.now() - 1000).toISOString() });
     expect(await actorFromToken(token)).toBeNull();
     expect(await repo.get("users", t.ownerId)).toBeTruthy();
+  });
+});
+
+describe("a brand-new consultancy", () => {
+  it("has a working dashboard with no cases yet", async () => {
+    const repo = new MemoryRepo();
+    setRepo(repo);
+    const t = await createOrganization(repo, { name: "Fresh Co", ownerName: "Owner", ownerEmail: "fresh@example.com", password: "password123" });
+    const d = await ownerDashboard(repo, t.orgId);
+    expect(d.totals.cases).toBe(0);
+    expect(d.staleRules.length).toBeGreaterThan(0); // its rules start Unverified
+  });
+
+  it("Firestore queries with filters never ask for a composite index (sorted in the app instead)", () => {
+    const calls: string[] = [];
+    const q = { where: (f: string) => (calls.push(`where:${f}`), q), orderBy: (f: string) => (calls.push(`orderBy:${f}`), q), limit: () => (calls.push("limit"), q) };
+    const filtered = applyQuery(q as never, [["organizationId", "==", "o"]], { orderBy: "updatedAt", desc: true, limit: 5 });
+    expect(calls).toEqual(["where:organizationId"]);
+    expect(filtered.local).toEqual({ orderBy: "updatedAt", desc: true, limit: 5 });
+    calls.length = 0;
+    expect(applyQuery(q as never, [], { orderBy: "createdAt" }).local).toBeUndefined();
+    expect(calls).toEqual(["orderBy:createdAt"]);
   });
 });
 

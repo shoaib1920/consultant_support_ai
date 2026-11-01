@@ -23,7 +23,7 @@ npm run dev                    # http://localhost:3000
 | Script | What it does |
 |---|---|
 | `npm run dev` / `build` / `start` | Next.js |
-| `npm test` | 79 unit/integration tests (Vitest) |
+| `npm test` | 81 unit/integration tests (Vitest) |
 | `npm run test:rules` | Firestore security-rules tests against the emulator (needs `firebase-tools` + Java) |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run seed` | Re-create demo data (memory store, or Firestore if configured) |
@@ -171,7 +171,7 @@ No other code changes are needed. Eligibility, gates, tasks, the report and the 
 
 ## Testing
 
-`npm test` runs 79 tests covering:
+`npm test` runs 81 tests covering:
 - the 28-day window: day-19 failure, the 31-day rule, coverage, carry-forward balances, deposits
 - funds formulas for all four countries, plus FX and rule scoping
 - rule staleness, and that no case is GREEN on an Unverified, Conflicting, Stale or missing rule
