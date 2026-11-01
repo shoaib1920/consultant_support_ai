@@ -4,7 +4,7 @@
   "private": true,
   "description": "VisaGuard - case management and risk screening for study-visa consultancies",
   "engines": {
-    "node": "22.x"
+    "node": ">=22"
   },
   "scripts": {
     "dev": "next dev",
@@ -44,5 +44,10 @@
     "typescript": "5.9.3",
     "vite": "6.4.5",
     "vitest": "3.2.7"
+  },
+  "overrides": {
+    "jwks-rsa": {
+      "jose": "5.10.0"
+    }
   }
 }

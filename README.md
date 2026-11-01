@@ -28,7 +28,7 @@ npm run dev                    # http://localhost:3000
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run seed` | Re-create demo data (memory store, or Firestore if configured) |
 
-**Node 22** (pinned in `package.json`; `firebase-admin` 14 does not load on Node 20).
+**Node 22 or newer** (`firebase-admin` 14 requires it). `package.json` overrides `jwks-rsa`'s `jose` to 5.10, which can be `require`d on every Node version; without that, Firebase sign-in fails with `ERR_REQUIRE_ESM` on Node versions that cannot `require()` ES modules.
 
 ### Demo walkthrough (6 scenarios)
 
