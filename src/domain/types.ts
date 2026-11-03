@@ -299,7 +299,7 @@ export interface ExtractedFields extends Base {
   legible?: boolean;
   expiryDate?: string | null;
   injectionSuspected?: boolean;
-  source: "claude" | "mock" | "manual" | "seed";
+  source: AiSource | "manual" | "seed";
   model?: string;
   promptVersion?: string;
   transactions?: BankTransaction[]; // for bank statements
@@ -398,6 +398,31 @@ export interface Programme extends Base {
   complianceNotes?: string;
   sampleData: boolean;
   active: boolean;
+  source?: ProgrammeSource;
+}
+
+/** Programme requirements that can be read from the university's official page. */
+export const PROGRAMME_SOURCE_FIELDS = ["universityName", "city", "name", "level", "field", "minCGPA4", "minGermanGrade", "ielts", "pte", "duolingo", "moiAccepted", "germanLevel", "tuitionPerYear", "currency", "durationMonths", "intakeLabel", "intakeStart", "intakeDeadline"] as const;
+export type ProgrammeSourceField = (typeof PROGRAMME_SOURCE_FIELDS)[number];
+export type ProgrammeFieldValues = Partial<Record<ProgrammeSourceField, string | number | boolean>>;
+
+/**
+ * Where a programme's requirements came from. Imported from the official page, confirmed by staff,
+ * and re-read nightly: differences are proposed as `changes` for a manager to apply, never applied silently.
+ */
+export interface ProgrammeSource {
+  urls: string[];
+  importedAt: string;
+  importedBy: string;
+  checkedAt: string;
+  contentHash: string;
+  model: string;
+  promptVersion: string;
+  evidence: Partial<Record<ProgrammeSourceField, string>>; // short quote from the official page per field
+  readValues: ProgrammeFieldValues; // what the page said at the last accepted read (baseline for change detection)
+  status: "in_sync" | "changed" | "unreachable";
+  changes?: { field: ProgrammeSourceField; before: string | number | boolean | null; after: string | number | boolean; evidence?: string }[];
+  lastError?: string;
 }
 
 // ---------------- Eligibility ----------------
@@ -450,13 +475,20 @@ export interface EligibilityResult extends Base {
   ai?: AiNarrative;
 }
 
+/** Which AI produced an output. "mock" is the offline stand-in used in demos. */
+export type AiSource = "claude" | "gemini" | "mock";
+
+export function aiSourceLabel(source: AiSource | "manual" | "seed"): string {
+  return source === "claude" ? "Claude" : source === "gemini" ? "Gemini" : source === "mock" ? "Mock AI" : source === "manual" ? "Entered by staff" : "Seed data";
+}
+
 export interface AiNarrative {
   summary: string;
   points: { text: string; cites: string[]; confidence: Confidence }[];
   model: string;
   promptVersion: string;
   generatedAt: string;
-  source: "claude" | "mock";
+  source: AiSource;
 }
 
 // ---------------- Financial ----------------
@@ -680,7 +712,7 @@ export interface AuditEntry {
   caseId?: string;
   before?: unknown;
   after?: unknown;
-  ai?: { model: string; promptVersion: string; source: "claude" | "mock" };
+  ai?: { model: string; promptVersion: string; source: AiSource };
   prevHash: string;
   hash: string;
 }

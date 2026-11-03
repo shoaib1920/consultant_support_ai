@@ -21,7 +21,7 @@ export async function run(fn: () => Promise<ActionResult | string | void>): Prom
     if (e instanceof GateError) return { ok: false, error: e.message, blockers: e.blockers };
     if (e instanceof ZodError) return { ok: false, error: "Please fix the highlighted fields", blockers: e.issues.map((i) => `${i.path.join(".") || "input"}: ${i.message}`) };
     if (e instanceof AuthError || e instanceof ValidationError || e instanceof NotFoundError) return { ok: false, error: e.message };
-    if (e instanceof Error && (e.name === "RateLimitError" || e.name === "AIError")) return { ok: false, error: e.message };
+    if (e instanceof Error && (e.name === "RateLimitError" || e.name === "AIError" || e.name === "PageFetchError")) return { ok: false, error: e.message };
     console.error(e);
     return { ok: false, error: "Something went wrong. The action was not completed." };
   }

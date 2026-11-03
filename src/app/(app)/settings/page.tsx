@@ -4,7 +4,7 @@ import { ActionForm, SubmitButton } from "@/components/action-form";
 import { ActionButton } from "@/components/client-bits";
 import { Badge, Card, CardContent, CardDescription, CardHeader, CardTitle, Field, Input, PageHeader, Select, Table, Td, Th } from "@/components/ui/primitives";
 import { createUserAction, resetDemoAction, toggleUserAction } from "@/server/actions";
-import { aiConfigured } from "@/server/ai";
+import { aiConfigured, aiDailyLimit, aiProviderLabel, aiUsageToday } from "@/server/ai";
 import { ROLE_LABELS, can } from "@/server/auth/rbac";
 import { demoMode } from "@/server/auth/session";
 import { firebaseConfigured, getRepo } from "@/server/db";
@@ -23,7 +23,7 @@ export default async function SettingsPage() {
       <PageHeader title="Settings" description={org?.name} />
       <div className="grid gap-3 md:grid-cols-3">
         <Card><CardContent className="flex items-center gap-3 p-4"><Database className="size-5" /><div><div className="text-sm font-medium">Datastore</div><div className="text-xs text-muted-foreground">{firebaseConfigured() ? "Firestore (firebase-admin)" : <>MOCK — local JSON file <Badge tone="amber">mock</Badge></>}</div></div></CardContent></Card>
-        <Card><CardContent className="flex items-center gap-3 p-4"><Bot className="size-5" /><div><div className="text-sm font-medium">AI provider</div><div className="text-xs text-muted-foreground">{aiConfigured() ? `Claude (${process.env.ANTHROPIC_MODEL || "claude-opus-5-5"})` : <>MOCK extractor/narrator <Badge tone="amber">mock</Badge></>}</div></div></CardContent></Card>
+        <Card><CardContent className="flex items-center gap-3 p-4"><Bot className="size-5" /><div><div className="text-sm font-medium">AI provider</div><div className="text-xs text-muted-foreground">{aiConfigured() ? <>{aiProviderLabel()}{aiDailyLimit() > 0 && <> · {await aiUsageToday()} / {aiDailyLimit()} AI calls used today</>}</> : <>MOCK extractor/narrator <Badge tone="amber">mock</Badge></>}</div></div></CardContent></Card>
         <Card><CardContent className="flex items-center gap-3 p-4"><KeyRound className="size-5" /><div><div className="text-sm font-medium">Authentication</div><div className="text-xs text-muted-foreground">{firebaseConfigured() ? "Firebase Auth session cookies" : <>MOCK — demo sign-in <Badge tone="amber">mock</Badge></>}</div></div></CardContent></Card>
       </div>
 

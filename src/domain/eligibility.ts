@@ -77,11 +77,17 @@ const RELATED_FIELDS: string[][] = [
 ];
 
 export function fieldsAligned(a?: string, b?: string): boolean | undefined {
+  const m = fieldMatch(a, b);
+  return m === undefined ? undefined : m !== "different";
+}
+
+/** "same" subject (shared key word), "related" (same family, e.g. Computer Science ↔ Data Science) or "different". */
+export function fieldMatch(a?: string, b?: string): "same" | "related" | "different" | undefined {
   const ta = tokens(a);
   const tb = tokens(b);
   if (!ta.size || !tb.size) return undefined;
-  for (const t of ta) if (tb.has(t)) return true;
-  return RELATED_FIELDS.some((group) => [...ta].some((t) => group.includes(t)) && [...tb].some((t) => group.includes(t)));
+  for (const t of ta) if (tb.has(t)) return "same";
+  return RELATED_FIELDS.some((group) => [...ta].some((t) => group.includes(t)) && [...tb].some((t) => group.includes(t))) ? "related" : "different";
 }
 
 function bestEnglish(tests: EnglishTest[], today: string): { valid: EnglishTest[]; expired: EnglishTest[] } {

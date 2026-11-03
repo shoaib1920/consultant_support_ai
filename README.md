@@ -23,7 +23,7 @@ npm run dev                    # http://localhost:3000
 | Script | What it does |
 |---|---|
 | `npm run dev` / `build` / `start` | Next.js |
-| `npm test` | 81 unit/integration tests (Vitest) |
+| `npm test` | 102 unit/integration tests (Vitest) |
 | `npm run test:rules` | Firestore security-rules tests against the emulator (needs `firebase-tools` + Java) |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run seed` | Re-create demo data (memory store, or Firestore if configured) |
@@ -57,9 +57,12 @@ Also available:
 | `SESSION_SECRET` | yes (prod) | HMAC key for session cookies and signed file URLs |
 | `STORAGE_ENCRYPTION_KEY` | recommended | AES-256-GCM key for uploads in local/mock storage |
 | `DEMO_MODE` | – | Exactly `true` = demo banner, demo login, auto-seed. Unset (or anything else) = live mode. |
-| `ANTHROPIC_API_KEY` | no | Enables Claude. If empty, the **mock** AI is used. |
+| `GEMINI_API_KEY` | no | Enables Google Gemini (free key from aistudio.google.com). If no AI key is set, the **mock** AI is used. |
+| `GEMINI_MODEL` | no | Default `gemini-2.5-flash` |
+| `ANTHROPIC_API_KEY` | no | Enables Claude (paid). Used instead of Gemini when both are set, unless `AI_PROVIDER=gemini`. |
 | `ANTHROPIC_MODEL` | no | Default `claude-opus-5-5` |
 | `AI_RATE_LIMIT_PER_MINUTE` | no | Per-user AI call limit (default 10) |
+| `AI_PROVIDER_RPM` / `AI_DAILY_LIMIT` | no | Quota guard for the shared key. Defaults: Gemini 8 per minute and 200 per day; Claude 40 per minute, no daily cap. The nightly job uses at most 60% of the day. |
 | `FIREBASE_SERVICE_ACCOUNT_JSON` | no | Service-account JSON on one line. Enables Firestore, Storage and Auth. |
 | `NEXT_PUBLIC_FIREBASE_*` | with Firebase | Client SDK config for email/password sign-in |
 | `FILE_STORAGE` | no | `firestore` (default with Firebase; uploads stored as encrypted chunks in Firestore, works on the **free Spark plan**), `firebase` (Firebase Storage, Blaze plan) or `local` (mock) |
@@ -136,7 +139,7 @@ Run **two Vercel projects** from the same repo:
 | Demo (for outreach) | `true` | Prospects. Role-picker login, fictional data only. |
 | Live (for clients) | not set | Paying consultancies. Email/password login only. |
 
-The live project needs `SESSION_SECRET`, `STORAGE_ENCRYPTION_KEY`, `CRON_SECRET`, `FIREBASE_SERVICE_ACCOUNT_JSON`, the `NEXT_PUBLIC_FIREBASE_*` values and, for real document reading, `ANTHROPIC_API_KEY`. Without that key, uploads are marked "enter key fields manually"; they are never filled in automatically.
+The live project needs `SESSION_SECRET`, `STORAGE_ENCRYPTION_KEY`, `CRON_SECRET`, `FIREBASE_SERVICE_ACCOUNT_JSON`, the `NEXT_PUBLIC_FIREBASE_*` values and, for real document reading, `GEMINI_API_KEY` (free) or `ANTHROPIC_API_KEY`. Without an AI key, uploads are marked "enter key fields manually"; they are never filled in automatically.
 
 **Self-service sign-up (14-day free trial):** a consultancy can create its own workspace at `/signup` (linked from the login page). This creates the organisation, its owner login with the password they choose, and its own rules table (all **Unverified**). The workspace is on a **14-day free trial**: staff see the days left in a banner, and when the trial ends nobody in that organisation can sign in (existing sessions stop working too) until you upgrade it. The data is kept. To upgrade, set `plan` to `"active"` on its `organizations/{id}` document in the Firebase console. On the demo deployment, set `SIGNUP_URL` to the live app's `/signup` so prospects land there.
 
@@ -150,7 +153,18 @@ This creates an **active** (paid, no trial) organisation, its owner and its own 
 
 **Firebase console, once:** Authentication → Sign-in method → Email/Password **on**; Authentication → Settings → **User actions → turn off "Enable create (sign-up)"**, so accounts can only be created by the server (the `/signup` page and staff invitations still work, because they use the Admin SDK); Authorized domains → add the live Vercel domain.
 
-**Nightly job:** `vercel.json` schedules `/api/cron/daily` at 03:00 Pakistan time to re-assess open cases (rule expiry, deadlines). Set `CRON_SECRET` in the Vercel project for it to run.
+**Nightly job:** `vercel.json` schedules `/api/cron/daily` at 03:00 Pakistan time to re-assess open cases (rule expiry, deadlines) and re-read imported programmes' official pages. Set `CRON_SECRET` in the Vercel project for it to run.
+
+## Programme data from official university websites
+
+Staff do not type programme requirements. On **Universities → Import from the official university website** they paste the programme's official link (plus up to two more, e.g. the entry-requirements or international-fees page):
+
+1. The server fetches the page (public `http(s)` hosts only; internal/private addresses, odd ports and embedded logins are refused; redirects re-checked; 3 MB / 15 s caps) and reduces it to text, or passes PDFs through as-is.
+2. The AI (Gemini or Claude) reads it (`extractProgramme`, prompt `programme-v1`), receiving only the parts of the page about requirements, fees, English and dates (≤ 30k characters per page, to save quota), and returns each requirement with the **exact sentence from the page** as proof. Values are range-checked (IELTS 3–9, CGPA 1–4, …); anything implausible is dropped and listed. A UK class such as "2:1" is never turned into a CGPA unless the page gives the Pakistan equivalent.
+3. Staff see the filled form (page-sourced fields tinted green), the proof table and anything missing, then save. The import is carried in a signed, org-bound token valid for 24 h, so the stored source cannot be forged.
+4. Every night the page is read again. Unchanged text costs nothing; changed text is re-read, and any requirement that differs from the last accepted read is proposed to owners and managers (notification + amber row) with **Apply changes** / **Keep current values**. Nothing is applied silently, and cases keep the requirements they were assessed against.
+
+Limits: sites that build their pages with JavaScript expose little text to a server fetch (the importer warns; add the requirements or fees page, or a PDF link). Without an AI key, the demo uses a pattern-matching Mock reader, and live mode refuses the import rather than guess.
 
 **Limits to know:** uploads are capped at 4 MB (Vercel's request limit). Vercel's free Hobby plan is for non-commercial use; move the live project to Pro once clients pay.
 
@@ -171,7 +185,7 @@ No other code changes are needed. Eligibility, gates, tasks, the report and the 
 
 ## Testing
 
-`npm test` runs 81 tests covering:
+`npm test` runs 102 tests covering:
 - the 28-day window: day-19 failure, the 31-day rule, coverage, carry-forward balances, deposits
 - funds formulas for all four countries, plus FX and rule scoping
 - rule staleness, and that no case is GREEN on an Unverified, Conflicting, Stale or missing rule
@@ -184,6 +198,9 @@ No other code changes are needed. Eligibility, gates, tasks, the report and the 
   - a static check that the Firestore rules deny gated writes
 - audit-chain tamper detection, transaction rollback, prompt-injection handling, rate limiting
 - the 14-day free trial: countdown, sign-up validation, and sessions stopping when the trial ends
+- official-page import: HTML cleaning, refusal of internal addresses, value range checks, forged/foreign import tokens, and the nightly change → apply / dismiss / unreachable cycle
+- the Gemini adapter (schema translation, 429 retry, "used up" message) and the quota guard (daily cap, 60% nightly share, per-minute pacing, page trimming)
+- university suggestions: desired course first, budget explanations, verified transcript / English result filling missing profile values (never overwriting)
 
 `npm run test:rules` additionally runs the rules against the emulator (not run in CI by default).
 
@@ -192,4 +209,5 @@ No other code changes are needed. Eligibility, gates, tasks, the report and the 
 - The AI and sign-up rate limiters are in-process. Back it with Firestore or Redis for multi-instance deployments.
 - Cloud Functions are written against firebase-functions v2 but **were not deployed or executed** in this build.
 - The Firestore-rules emulator test was not run here (no Java or emulator). The static rules check and the service-level tests did run.
-- Claude extraction was not exercised against the live API in this build (no key). The adapter follows the SDK's documented types and type-checks.
+- Claude extraction was not exercised against the live API in this build (no key). The adapter follows the SDK's documented types and type-checks. The same applies to the official-page reader; its fetch and change tracking were tried against a real university site with the Mock reader.
+- The official-page fetcher checks the host's addresses before fetching; a DNS answer that changes between that check and the fetch is not pinned. Pin the resolved address (custom `undici` agent) if the importer is exposed to untrusted staff.

@@ -2,7 +2,7 @@
 
 import { COUNTRIES } from "./countries";
 import { daysBetween, formatDate, todayISO } from "./dates";
-import { fieldsAligned } from "./eligibility";
+import { fieldMatch, fieldsAligned } from "./eligibility";
 import { computeFundsRequirement, convert, formatMoney } from "./funds";
 import { normalise, qualifyingRecord } from "./grades";
 import { RuleContext } from "./rules";
@@ -21,7 +21,7 @@ export function matchProgrammes(student: Student, programmes: Programme[], rules
   const rec = qualifyingRecord(student.education, level);
   const grade = rec ? normalise(rec) : undefined;
   const options: MatchOption[] = [];
-  const failureTally = { academic: 0, language: 0, budget: 0, intake: 0 };
+  const failureTally = { academic: 0, language: 0, budget: 0, intake: 0, course: 0 };
 
   for (const p of programmes.filter((x) => x.active && x.level === level && countries.includes(x.country))) {
     const why: string[] = [];
@@ -63,7 +63,19 @@ export function matchProgrammes(student: Student, programmes: Programme[], rules
       missing.push("Programme minimum not recorded");
     }
 
-    // field alignment
+    // the course the student wants (e.g. "Data Science"): other subjects sink to the bottom
+    const wanted = student.intended.field?.trim();
+    const desired = wanted ? fieldMatch(wanted, `${p.name} ${p.field} ${p.keywords.join(" ")}`) : undefined;
+    if (desired === "different") {
+      fit -= 30;
+      failureTally.course++;
+      why.push(`Not the course the student wants (${wanted})`);
+    } else if (desired === "related") {
+      fit -= 12;
+      why.push(`Related to the course the student wants (${wanted})`);
+    } else if (desired === "same") why.push(`Matches the course the student wants (${wanted})`);
+
+    // field alignment with previous study
     const aligned = fieldsAligned(rec?.field ?? rec?.program, `${p.field} ${p.keywords.join(" ")}`);
     if (aligned === false) {
       fit -= 10;
@@ -100,7 +112,7 @@ export function matchProgrammes(student: Student, programmes: Programme[], rules
       fit -= Math.min(25, Math.round(over * 50));
       failureTally.budget++;
       why.push(`Estimated first-year cost ${formatMoney(Math.round(pkr.amount), "PKR")} exceeds budget`);
-    }
+    } else if (student.budget.totalPKR && pkr) why.push(`Within budget: about ${formatMoney(Math.round(pkr.amount), "PKR")} of ${formatMoney(student.budget.totalPKR, "PKR")}`);
 
     // intake
     const intake = p.intakes.filter((i) => daysBetween(today, i.applicationDeadline) >= 0).sort((a, b) => a.applicationDeadline.localeCompare(b.applicationDeadline))[0];
@@ -156,6 +168,7 @@ export function matchProgrammes(student: Student, programmes: Programme[], rules
     if (failureTally.language) alternatives.push("Retake IELTS/PTE to reach the required score before applying.");
     if (failureTally.budget) alternatives.push("Wait to build funds, consider lower-tuition countries (Germany/Italy public universities), or apply for scholarships.");
     if (failureTally.intake) alternatives.push("Target the next intake/academic year.");
+    if (failureTally.course && !options.some((o) => o.why.some((w) => w.startsWith("Matches the course")))) alternatives.push(`No programme for "${student.intended.field}" in your database yet: import one from its official university page (Universities).`);
     if (!alternatives.length) alternatives.push("Widen countries of interest or fields in the profile.");
   }
   const honestSummary = !options.length

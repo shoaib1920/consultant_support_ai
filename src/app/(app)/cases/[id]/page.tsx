@@ -2,6 +2,7 @@ import Link from "next/link";
 import { CheckCircle2, CircleDashed, Download, Flag, ShieldAlert, ShieldCheck, Sparkles, XCircle } from "lucide-react";
 import { ACTION_LABELS, nextIrreversibleAction } from "@/domain/countries";
 import { formatDate, formatDateTime } from "@/domain/dates";
+import { aiSourceLabel } from "@/domain/types";
 import { ReasonItem } from "@/components/reason";
 import { ActionButton } from "@/components/client-bits";
 import { Alert, Badge, Card, CardContent, CardHeader, CardTitle, EmptyState, buttonVariants } from "@/components/ui/primitives";
@@ -105,7 +106,7 @@ export default async function CaseReport({ params }: { params: Promise<{ id: str
       {e?.ai && (
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2"><Sparkles className="size-4" /> AI explanation <Badge tone="neutral">{e.ai.source === "mock" ? "Mock AI" : "Claude"} · {e.ai.model} · {e.ai.promptVersion}</Badge></CardTitle>
+            <CardTitle className="flex items-center gap-2"><Sparkles className="size-4" /> AI explanation <Badge tone="neutral">{aiSourceLabel(e.ai.source)} · {e.ai.model} · {e.ai.promptVersion}</Badge></CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-2 text-sm">
             <p>{e.ai.summary}</p>

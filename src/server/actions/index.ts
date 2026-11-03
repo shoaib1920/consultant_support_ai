@@ -34,6 +34,7 @@ import { analyzeFromDocument, analyzeManual } from "../services/financial";
 import { cancelPreflight, confirmPreflight, grantOverride, signRiskAcknowledgment, startPreflight, transitionCase } from "../services/gates";
 import { attachReceipt, recordRefundablePayment, setPaymentStatus } from "../services/payments";
 import { runMatching, upsertProgramme } from "../services/programmes";
+import { importProgrammeDraft, recheckProgrammeSource, resolveProgrammeChanges } from "../services/programme-sources";
 import { createRule, updateRule, verifyRule } from "../services/rules";
 import { createOrganization, provisionAuthUser } from "../services/orgs";
 import { createIntakeLink, createPortalAccount, createStudent, deleteStudentData, saveProfile, saveProfileViaToken } from "../services/students";
@@ -503,9 +504,38 @@ const PROG_KEYS = ["universityName", "country", "city", "inLondon", "name", "lev
 export async function upsertProgrammeAction(programmeId: string | null, _: Prev, fd: FormData): Promise<ActionResult> {
   return run(async () => {
     const a = await requireActor("programmes.edit");
-    await upsertProgramme(await getRepo(), a, programmeId, ProgrammeSchema.parse(formObject(fd, PROG_KEYS)));
+    await upsertProgramme(await getRepo(), a, programmeId, ProgrammeSchema.parse(formObject(fd, PROG_KEYS)), str(fd, "sourceToken") || undefined);
     revalidatePath("/programmes");
     return "Programme saved.";
+  });
+}
+
+/** Reads the official programme page(s) and returns a draft for staff to check. Saves nothing. */
+export async function importProgrammeAction(_: Prev, fd: FormData): Promise<ActionResult> {
+  return run(async () => {
+    const a = await requireActor("programmes.edit");
+    const urls = fd.getAll("url").map((u) => (typeof u === "string" ? u : ""));
+    const draft = await importProgrammeDraft(a, urls);
+    return { ok: true, message: "Page read. Check the values below, then save.", data: { draft } };
+  });
+}
+
+export async function recheckProgrammeAction(programmeId: string): Promise<ActionResult> {
+  return run(async () => {
+    const a = await requireActor("programmes.edit");
+    checkRateLimit(`ai:${a.id}`);
+    const status = await recheckProgrammeSource(await getRepo(), a, programmeId);
+    revalidatePath("/programmes");
+    return status === "changed" ? "The official page has changes. Review them below." : status === "unreachable" ? { ok: false, error: "Could not read the official page. See the note on the programme." } : "Checked: matches the official page.";
+  });
+}
+
+export async function resolveProgrammeChangesAction(programmeId: string, apply: boolean): Promise<ActionResult> {
+  return run(async () => {
+    const a = await requireActor("programmes.edit");
+    await resolveProgrammeChanges(await getRepo(), a, programmeId, apply);
+    revalidatePath("/programmes");
+    return apply ? "Changes applied from the official page." : "Changes dismissed; current values kept.";
   });
 }
 

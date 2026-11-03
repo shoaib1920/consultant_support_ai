@@ -1,4 +1,33 @@
-// Defensive handling of text that originated from uploaded documents.
+// Defensive handling of text that originated from uploaded documents and official web pages.
+
+import type { z } from "zod";
+import { type AiSource, type CountryCode, PROGRAMME_SOURCE_FIELDS, type ProgrammeSourceField } from "@/domain/types";
+import { PROGRAMME_PROMPT_VERSION } from "./prompts";
+import type { ProgrammeExtraction, ProgrammeExtractionSchema, ProgrammePageRequest } from "./types";
+
+/** Keeps only known fields, cleans values and quotes, and flags instruction-like text from the page. */
+export function toProgrammeExtraction(raw: z.infer<typeof ProgrammeExtractionSchema>, req: ProgrammePageRequest, source: AiSource, model: string): ProgrammeExtraction {
+  const fields: ProgrammeExtraction["fields"] = {};
+  let injection = raw.containsInstructionLikeText || req.pages.some((p) => looksLikeInjection(p.text));
+  for (const f of raw.fields) {
+    if (!(PROGRAMME_SOURCE_FIELDS as readonly string[]).includes(f.key)) continue;
+    if (looksLikeInjection(f.value) || looksLikeInjection(f.quote)) injection = true;
+    const value = sanitizeValue(f.value, 200);
+    if (!value) continue;
+    fields[f.key as ProgrammeSourceField] = { value, quote: sanitizeValue(f.quote, 300), confidence: f.confidence };
+  }
+  const country = (["UK", "DE", "IT", "FR"] as const).find((c) => c === raw.country?.toUpperCase()) ?? null;
+  return {
+    isProgrammePage: raw.isProgrammePage,
+    injectionSuspected: injection,
+    country: country as CountryCode | null,
+    fields,
+    notes: raw.notes.map((n) => sanitizeValue(n, 300)).filter(Boolean),
+    source,
+    model,
+    promptVersion: PROGRAMME_PROMPT_VERSION,
+  };
+}
 
 const INJECTION_PATTERNS = [
   /ignore (all |any )?(previous|prior|above) (instructions|prompts)/i,

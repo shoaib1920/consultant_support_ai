@@ -26,6 +26,7 @@ export const COLLECTIONS = [
   "auditLog",
   "auditHeads",
   "files", // MOCK storage blobs index (memory mode only)
+  "aiUsage", // one document per day: AI calls made with the shared API key (free-tier budget)
 ] as const;
 export type CollectionName = (typeof COLLECTIONS)[number];
 

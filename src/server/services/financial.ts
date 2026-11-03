@@ -118,7 +118,7 @@ export async function analyzeFromDocument(repo: Repo, actor: Actor, caseId: stri
     transactions: sorted,
   };
   validateStatement(s);
-  return save(repo, actor, buildAnalysis(b, s, applicationDate, explanations, ef.source === "claude" ? "ai" : ef.source === "mock" ? "mock" : "manual", documentId, actor.organizationId));
+  return save(repo, actor, buildAnalysis(b, s, applicationDate, explanations, ef.source === "claude" || ef.source === "gemini" ? "ai" : ef.source === "mock" ? "mock" : "manual", documentId, actor.organizationId));
 }
 
 export function defaultApplicationDate(b: CaseBundle): string {

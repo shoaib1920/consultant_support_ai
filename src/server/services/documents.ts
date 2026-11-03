@@ -4,7 +4,7 @@
 import { DOC_LABELS } from "@/domain/countries";
 import { type DocFields, crossDocumentConsistency, documentChecks } from "@/domain/consistency";
 import { addDays } from "@/domain/dates";
-import type { Case, DocType, DocumentFlag, DocumentRecord, ExtractedFields, Student } from "@/domain/types";
+import type { Case, DocType, DocumentFlag, DocumentRecord, EnglishTestType, ExtractedFields, Student } from "@/domain/types";
 import { AIError, checkRateLimit, getAI } from "../ai";
 import { AuthError, can } from "../auth/rbac";
 import type { Actor } from "../auth/session";
@@ -14,6 +14,7 @@ import { getFile, putFile } from "../storage";
 import { audit } from "./audit";
 import { NotFoundError } from "./bundle";
 import { refreshStudentCases } from "./eligibility";
+import { refreshMatching } from "./programmes";
 import { syncTasks } from "./tasks";
 
 export const ALLOWED_MIME = ["application/pdf", "image/jpeg", "image/png", "image/webp", "application/json", "text/plain"];
@@ -244,5 +245,56 @@ export async function reviewDocument(repo: Repo, actor: Actor, documentId: strin
     await tx.update<DocumentRecord>("documents", documentId, { reviewStatus: status, reviewedBy: actor.name, reviewedAt: nowISO(), reviewNote: note.trim() || undefined, updatedAt: nowISO() });
     await audit(tx, actor, { action: `document.${status}`, entity: "documents", entityId: documentId, caseId: doc.caseId, before: { reviewStatus: doc.reviewStatus }, after: { reviewStatus: status, note } });
   });
+  if (status === "verified" && (await fillProfileFromDocument(repo, actor, doc)).length) await refreshMatching(repo, actor, doc.studentId, `${doc.docType} verified`);
   await recomputeConsistency(repo, actor, doc.studentId);
+}
+
+const ENGLISH_TYPES: EnglishTestType[] = ["IELTS", "PTE", "Duolingo", "TOEFL"];
+
+/**
+ * A verified transcript/degree or English result fills what the profile is still missing (CGPA,
+ * test score), so matching can suggest universities straight after upload. Typed values are never
+ * overwritten: a difference between profile and document is a consistency flag, not an edit.
+ */
+export async function fillProfileFromDocument(repo: Repo, actor: Actor, doc: DocumentRecord): Promise<string[]> {
+  const ef = await repo.get<ExtractedFields>("extractedFields", `ef_${doc.id}`);
+  const s = await repo.get<Student>("students", doc.studentId);
+  if (!ef || !s || s.organizationId !== actor.organizationId) return [];
+  const num = (v: unknown) => (typeof v === "number" ? v : typeof v === "string" && v.trim() ? Number(v.replace(/[,\s]/g, "")) : NaN);
+  const text = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim().slice(0, 120) : undefined);
+  const f = ef.fields;
+  const filled: string[] = [];
+  let next: Student = s;
+
+  if (doc.docType === "transcript" || doc.docType === "degree") {
+    const level = s.intended.level === "phd" ? "master" : s.intended.level === "master" || !s.intended.level ? "bachelor" : null;
+    const cgpa = num(f.cgpa);
+    const scale = Number.isFinite(num(f.scale)) ? num(f.scale) : cgpa <= 4 ? 4 : cgpa <= 5 ? 5 : NaN;
+    if (level && Number.isFinite(cgpa) && Number.isFinite(scale) && cgpa > 0 && cgpa <= scale) {
+      const rec = s.education.find((e) => e.level === level);
+      if (!rec) {
+        next = { ...next, education: [...next.education, { id: newId("ed_"), level, institution: text(f.institution) ?? "", program: text(f.program), field: text(f.program), endDate: text(f.completionDate), gradeType: "cgpa", obtained: cgpa, total: scale, completed: true }] };
+        filled.push(`${level} CGPA ${cgpa}/${scale}`);
+      } else if (rec.obtained == null) {
+        next = { ...next, education: next.education.map((e) => (e.id === rec.id ? { ...e, gradeType: "cgpa", obtained: cgpa, total: scale, program: e.program ?? text(f.program), field: e.field ?? text(f.program) } : e)) };
+        filled.push(`${level} CGPA ${cgpa}/${scale}`);
+      }
+    }
+  }
+  if (doc.docType === "english_test") {
+    const type = ENGLISH_TYPES.find((t) => t.toLowerCase() === String(f.testType ?? "").trim().toLowerCase().split(/\s/)[0]);
+    const overall = num(f.overall);
+    if (type && Number.isFinite(overall) && overall > 0 && !s.englishTests.some((t) => t.type === type)) {
+      const band = (k: string) => (Number.isFinite(num(f[k])) ? num(f[k]) : undefined);
+      next = { ...next, englishTests: [...next.englishTests, { id: newId("et_"), type, overall, listening: band("listening"), reading: band("reading"), writing: band("writing"), speaking: band("speaking"), testDate: text(f.testDate) }] };
+      filled.push(`${type} ${overall}`);
+    }
+  }
+  if (!filled.length) return [];
+  await repo.transaction(async (tx) => {
+    await tx.set("students", s.id, { ...next, updatedAt: nowISO() });
+    await audit(tx, actor, { action: "student.profile_filled_from_document", entity: "students", entityId: s.id, caseId: doc.caseId, after: { documentId: doc.id, docType: doc.docType, filled } });
+  });
+  await refreshStudentCases(repo, actor, s.id);
+  return filled;
 }

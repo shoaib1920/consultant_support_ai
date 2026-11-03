@@ -9,6 +9,7 @@ import { type AuditActor, audit } from "./audit";
 import { provisionAuthUser } from "./orgs";
 import { NotFoundError } from "./bundle";
 import { refreshStudentCases } from "./eligibility";
+import { refreshMatching } from "./programmes";
 
 export const CONSENT_VERSION = "2026-10-v1";
 export const CONSENT_TEXT =
@@ -80,6 +81,7 @@ export async function saveProfile(repo: Repo, actor: Actor, studentId: string, i
   });
   await syncCaseNames(repo, actor.organizationId, studentId, input.personal.fullName);
   await refreshStudentCases(repo, actor, studentId);
+  await refreshMatching(repo, actor, studentId, "profile saved");
 }
 
 async function syncCaseNames(repo: Repo, organizationId: string, studentId: string, name: string) {
@@ -121,6 +123,7 @@ export async function saveProfileViaToken(repo: Repo, token: string, input: Stud
     await audit(tx, sys, { action: "student.profile_saved_via_link", entity: "students", entityId: s.id, after: { consent: true } });
   });
   await refreshStudentCases(repo, sys, s.id);
+  await refreshMatching(repo, sys, s.id, "profile submitted via secure link");
 }
 
 export async function createPortalAccount(repo: Repo, actor: Actor, studentId: string): Promise<{ userId: string; setupLink?: string }> {

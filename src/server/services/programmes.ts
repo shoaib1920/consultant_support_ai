@@ -4,11 +4,13 @@ import { type Actor, assertCan } from "../auth/session";
 import { type Repo, newId, nowISO } from "../db";
 import type { z } from "zod";
 import type { ProgrammeSchema } from "../schemas";
-import { audit } from "./audit";
+import { type AuditActor, audit } from "./audit";
 import { NotFoundError } from "./bundle";
+import { sourceFromToken } from "./programme-sources";
 
-export async function upsertProgramme(repo: Repo, actor: Actor, programmeId: string | null, input: z.infer<typeof ProgrammeSchema>) {
+export async function upsertProgramme(repo: Repo, actor: Actor, programmeId: string | null, input: z.infer<typeof ProgrammeSchema>, sourceToken?: string) {
   assertCan(actor, "programmes.edit");
+  const imported = sourceFromToken(actor, sourceToken);
   await repo.transaction(async (tx) => {
     const unis = await tx.list<University>("universities", [["organizationId", "==", actor.organizationId]]);
     const now = nowISO();
@@ -46,14 +48,19 @@ export async function upsertProgramme(repo: Repo, actor: Actor, programmeId: str
       complianceNotes: input.complianceNotes,
       sampleData: false, // edited or user-created entries are no longer sample data
       active: input.active,
+      ...((imported ?? prev?.source) ? { source: imported ?? prev?.source } : {}),
     };
     await tx.set("programmes", p.id, p);
-    await audit(tx, actor, { action: prev ? "programme.updated" : "programme.created", entity: "programmes", entityId: p.id, before: prev ?? undefined, after: p });
+    await audit(tx, actor, { action: prev ? "programme.updated" : "programme.created", entity: "programmes", entityId: p.id, before: prev ?? undefined, after: imported ? { ...p, importedFrom: imported.urls, model: imported.model, promptVersion: imported.promptVersion } : p });
   });
 }
 
 export async function runMatching(repo: Repo, actor: Actor, studentId: string): Promise<MatchResult> {
   assertCan(actor, "analysis.run");
+  return saveMatching(repo, actor, studentId);
+}
+
+async function saveMatching(repo: Repo, actor: AuditActor, studentId: string, trigger?: string): Promise<MatchResult> {
   const org: [string, "==", string] = ["organizationId", "==", actor.organizationId];
   const [student, programmes, rules] = await Promise.all([repo.get<Student>("students", studentId), repo.list<Programme>("programmes", [org]), repo.list<Rule>("rules", [org])]);
   if (!student || student.organizationId !== actor.organizationId) throw new NotFoundError("Student");
@@ -62,7 +69,19 @@ export async function runMatching(repo: Repo, actor: Actor, studentId: string): 
   const res: MatchResult = { id: `mr_${studentId}`, organizationId: actor.organizationId, createdAt: now, updatedAt: now, studentId, ...m };
   await repo.transaction(async (tx) => {
     await tx.set("matchResults", res.id, res);
-    await audit(tx, actor, { action: "matching.run", entity: "matchResults", entityId: res.id, after: { options: m.options.length, strongMatch: m.strongMatch } });
+    await audit(tx, actor, { action: "matching.run", entity: "matchResults", entityId: res.id, after: { options: m.options.length, strongMatch: m.strongMatch, trigger } });
   });
   return res;
+}
+
+/**
+ * Re-ranks programmes for a student after their profile or a verified document changed, so staff
+ * always see current suggestions without pressing a button. Never blocks the change that triggered it.
+ */
+export async function refreshMatching(repo: Repo, actor: AuditActor, studentId: string, trigger: string): Promise<void> {
+  try {
+    await saveMatching(repo, actor, studentId, trigger);
+  } catch (e) {
+    console.error("matching refresh failed for", studentId, e);
+  }
 }

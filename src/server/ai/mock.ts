@@ -6,8 +6,8 @@
 import { addDays } from "@/domain/dates";
 import type { AiNarrative, Confidence, DocType, Student } from "@/domain/types";
 import { EXTRACTION_PROMPT_VERSION, NARRATIVE_PROMPT_VERSION } from "./prompts";
-import { coerceField, looksLikeInjection } from "./sanitize";
-import type { AIProvider, ExtractionOutput, ExtractionRequest, NarrativeRequest } from "./types";
+import { coerceField, looksLikeInjection, toProgrammeExtraction } from "./sanitize";
+import type { AIProvider, ExtractionOutput, ExtractionRequest, NarrativeRequest, ProgrammeExtraction, ProgrammePageRequest } from "./types";
 
 const MOCK_MODEL = "mock-extractor-1";
 
@@ -117,6 +117,57 @@ export class MockProvider implements AIProvider {
       generatedAt: new Date().toISOString(),
       source: "mock",
     };
+  }
+
+  /** Pattern-based stand-in for Claude: finds the common requirement phrasings on a programme page. */
+  async extractProgramme(req: ProgrammePageRequest): Promise<ProgrammeExtraction> {
+    const text = req.pages.map((p) => [p.title ?? "", p.text].join("\n")).join("\n\n");
+    const fields: { key: string; value: string; quote: string; confidence: Confidence }[] = [];
+    const notes: string[] = ["Read by the Mock AI (pattern matching, no Claude key). Check every value against the page."];
+    const sentence = (i: number) => {
+      const start = Math.max(text.lastIndexOf("\n", i), text.lastIndexOf(". ", i) + 1, 0);
+      const ends = [text.indexOf("\n", i), text.indexOf(". ", i)].filter((x) => x > 0);
+      return text.slice(start, ends.length ? Math.min(...ends) + 1 : i + 160).trim().slice(0, 220);
+    };
+    const find = (key: string, re: RegExp, pick: (m: RegExpExecArray) => string | null, confidence: Confidence = "medium") => {
+      const m = re.exec(text);
+      const v = m && pick(m);
+      if (m && v) fields.push({ key, value: v, quote: sentence(m.index), confidence });
+    };
+    const MONTHS = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"];
+    const isoFrom = (d: string, mon: string, y: string) => `${y}-${String(MONTHS.indexOf(mon.toLowerCase()) + 1).padStart(2, "0")}-${d.padStart(2, "0")}`;
+
+    const title = req.pages[0]?.title ?? "";
+    const parts = title.split(/\s[|\-–—]\s/).map((s) => s.trim()).filter(Boolean);
+    const uni = parts.find((s) => /universit|college|politecnico|hochschule|école|ecole|school of/i.test(s));
+    if (uni) fields.push({ key: "universityName", value: uni, quote: title, confidence: "medium" });
+    const prog = parts.find((s) => s !== uni && /\b(MSc|MA|MBA|MEng|MRes|LLM|BSc|BA|BEng|PhD|Master|Bachelor|Laurea|Foundation)\b/i.test(s));
+    if (prog) fields.push({ key: "name", value: prog, quote: title, confidence: "medium" });
+    const lvl = /\b(PhD|Doctor)/i.test(prog ?? text) ? "phd" : /\b(MSc|MA|MBA|MEng|MRes|LLM|Master|Laurea Magistrale)\b/i.test(prog ?? text) ? "master" : /\b(BSc|BA|BEng|Bachelor)\b/i.test(prog ?? text) ? "bachelor" : /\bFoundation\b/i.test(prog ?? text) ? "foundation" : null;
+    if (lvl) fields.push({ key: "level", value: lvl, quote: prog ?? title, confidence: "low" });
+
+    find("ielts", /IELTS[^0-9\n]{0,60}?(\d(?:\.\d)?)\b/i, (m) => (Number(m[1]) >= 4 && Number(m[1]) <= 9 ? m[1] : null));
+    find("pte", /PTE[^0-9\n]{0,60}?(\d{2})\b/i, (m) => m[1]);
+    find("duolingo", /Duolingo[^0-9\n]{0,60}?(\d{2,3})\b/i, (m) => m[1]);
+    find("minCGPA4", /(?:CGPA|GPA)[^0-9\n]{0,40}?(\d\.\d{1,2})\s*(?:\/|out of)\s*4(?:\.0+)?\b/i, (m) => m[1]);
+    find("moiAccepted", /medium of instruction|\bMOI\b/i, () => "true", "low");
+    find("germanLevel", /German[^.\n]{0,40}\b(A1|A2|B1|B2|C1|C2)\b/i, (m) => m[1]);
+    find("tuitionPerYear", /(?:international|overseas)[^£€$\n]{0,80}([£€$])\s?([\d,]{4,7})/i, (m) => m[2].replace(/,/g, ""));
+    const cur = /(?:international|overseas)[^£€$\n]{0,80}([£€$])/i.exec(text)?.[1];
+    if (cur) fields.push({ key: "currency", value: cur === "£" ? "GBP" : cur === "€" ? "EUR" : "USD", quote: cur, confidence: "medium" });
+    find("durationMonths", /\b(\d{1,2}|one|two|three|four)\s+(year|month)s?\b[^.\n]{0,20}full[- ]time/i, (m) => {
+      const n = { one: 1, two: 2, three: 3, four: 4 }[m[1].toLowerCase() as "one"] ?? Number(m[1]);
+      return String(m[2].toLowerCase() === "year" ? n * 12 : n);
+    });
+    find("intakeStart", /(?:start|starts|starting|intake|entry)[^.\n]{0,40}?\b(\d{1,2})\s+(January|February|March|April|May|June|July|August|September|October|November|December)\s+(20\d\d)/i, (m) => isoFrom(m[1], m[2], m[3]));
+    if (!fields.some((f) => f.key === "intakeStart")) find("intakeStart", /(?:start|starts|starting|intake|entry)[^.\n]{0,40}?\b(January|February|March|April|May|June|July|August|September|October|November|December)\s+(20\d\d)/i, (m) => isoFrom("1", m[1], m[2]), "low");
+    const start = fields.find((f) => f.key === "intakeStart");
+    if (start) fields.push({ key: "intakeLabel", value: start.value.slice(0, 7), quote: start.quote, confidence: start.confidence });
+    find("intakeDeadline", /deadline[^.\n]{0,60}?\b(\d{1,2})\s+(January|February|March|April|May|June|July|August|September|October|November|December)\s+(20\d\d)/i, (m) => isoFrom(m[1], m[2], m[3]));
+    if (/\b2:1\b|upper second/i.test(text) && !fields.some((f) => f.key === "minCGPA4")) notes.push("The page asks for a UK 2:1 but gives no Pakistan CGPA equivalent: enter the minimum CGPA yourself.");
+
+    const country = /\.ac\.uk|united kingdom|\bUK\b|£/i.test(req.pages.map((p) => p.url).join(" ") + text) ? "UK" : /\.de\b|germany|deutschland/i.test(text) ? "DE" : /\.it\b|italy|italia/i.test(text) ? "IT" : /\.fr\b|france/i.test(text) ? "FR" : null;
+    return toProgrammeExtraction({ isProgrammePage: fields.length >= 2, containsInstructionLikeText: false, country, fields, notes }, req, "mock", "mock-programme-reader-1");
   }
 }
 

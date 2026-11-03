@@ -6,7 +6,7 @@ import { formatDate } from "@/domain/dates";
 import { topRisks } from "@/domain/eligibility";
 import { riskClearance } from "@/domain/gates";
 import { computeDeadlines } from "@/domain/tasks";
-import type { Deadline, Light, Reason } from "@/domain/types";
+import { type Deadline, type Light, type Reason, aiSourceLabel } from "@/domain/types";
 import { type CaseBundle, gateContext } from "./bundle";
 
 export interface ReportData {
@@ -54,7 +54,7 @@ export function buildReport(b: CaseBundle): ReportData {
     gate: riskClearance(gateContext(b)),
     ruleIssues: (e?.ruleIssues ?? []).map((i) => `${i.key}: ${i.problem}`),
     aiSummary: e?.ai?.summary,
-    aiSource: e?.ai ? `${e.ai.source === "mock" ? "Mock AI" : "Claude"} (${e.ai.model}, ${e.ai.promptVersion})` : undefined,
+    aiSource: e?.ai ? `${aiSourceLabel(e.ai.source)} (${e.ai.model}, ${e.ai.promptVersion})` : undefined,
   };
 }
 

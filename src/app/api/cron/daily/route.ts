@@ -1,11 +1,13 @@
 // Daily sweep (Vercel Cron, see vercel.json): re-assess every open case so rule staleness (60 days)
-// and deadlines are reflected in lights, tasks and notifications even when nobody opens the case.
+// and deadlines are reflected in lights, tasks and notifications even when nobody opens the case,
+// then re-read imported programmes' official pages and flag any requirement the university changed.
 // Replaces the Cloud Function `dailySweep`, which needs the Firebase Blaze plan.
 import { NextResponse, type NextRequest } from "next/server";
 import type { Case } from "@/domain/types";
 import { safeEqual } from "@/server/crypto";
 import { getRepo } from "@/server/db";
 import { recomputeEligibility } from "@/server/services/eligibility";
+import { recheckDueProgrammes } from "@/server/services/programme-sources";
 import { syncTasks } from "@/server/services/tasks";
 
 export const maxDuration = 300;
@@ -34,5 +36,7 @@ export async function GET(req: NextRequest) {
       console.error("daily sweep failed for", c.id, e);
     }
   }
-  return NextResponse.json({ ok: true, open: cases.length, reassessed: done, failed, seconds: Math.round((Date.now() - started) / 1000) });
+  // Then re-read official programme pages with whatever time is left; changes go to managers for review.
+  const programmes = await recheckDueProgrammes(repo, Math.max(0, BUDGET_MS - (Date.now() - started)));
+  return NextResponse.json({ ok: true, open: cases.length, reassessed: done, failed, programmes, seconds: Math.round((Date.now() - started) / 1000) });
 }

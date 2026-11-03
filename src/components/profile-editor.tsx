@@ -229,7 +229,7 @@ export function ProfileEditor({ student, save, mode, consentText }: { student: S
       <Section title="Study plans">
         <div className="grid gap-2 sm:grid-cols-3">
           <Field label="Intended level"><Select value={d.intended.level ?? ""} onChange={(x) => setD({ ...d, intended: { ...d.intended, level: (x.target.value || undefined) as never } })}><option value="">—</option><option value="foundation">Foundation</option><option value="bachelor">Bachelor</option><option value="master">Master</option><option value="phd">PhD</option></Select></Field>
-          <Field label="Field"><Input value={d.intended.field ?? ""} onChange={(x) => setD({ ...d, intended: { ...d.intended, field: x.target.value } })} /></Field>
+          <Field label="Desired course / subject" hint="e.g. Data Science. Used to suggest universities."><Input placeholder="e.g. Data Science" value={d.intended.field ?? ""} onChange={(x) => setD({ ...d, intended: { ...d.intended, field: x.target.value } })} /></Field>
           <Field label="Intake (YYYY-MM)"><Input pattern="\d{4}-\d{2}" placeholder="2027-09" value={d.intended.intake ?? ""} onChange={(x) => setD({ ...d, intended: { ...d.intended, intake: x.target.value } })} /></Field>
         </div>
         <div className="flex flex-wrap gap-3 text-sm">

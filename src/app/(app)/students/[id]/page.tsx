@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Download, Plus, Search } from "lucide-react";
+import { Download, Plus, Search, Sparkles } from "lucide-react";
 import { COUNTRIES, DOC_LABELS } from "@/domain/countries";
 import { formatDate } from "@/domain/dates";
-import type { Case, DocType, DocumentRecord, Student } from "@/domain/types";
+import type { Case, DocType, DocumentRecord, MatchResult, Student } from "@/domain/types";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { LightBadge, StageBadge } from "@/components/badges";
 import { ActionButton, CopyField } from "@/components/client-bits";
@@ -15,6 +15,7 @@ import { can } from "@/server/auth/rbac";
 import { getRepo } from "@/server/db";
 import { staffPage } from "@/server/page-guard";
 import { CONSENT_TEXT } from "@/server/services/students";
+import { pkr } from "@/lib/utils";
 
 export const metadata = { title: "Student" };
 
@@ -25,7 +26,7 @@ export default async function StudentPage({ params }: { params: Promise<{ id: st
   const s = await repo.get<Student>("students", id);
   if (!s || s.organizationId !== actor.organizationId) notFound();
   const org: [string, "==", string] = ["organizationId", "==", actor.organizationId];
-  const [cases, docs] = await Promise.all([repo.list<Case>("cases", [org, ["studentId", "==", id]]), repo.list<DocumentRecord>("documents", [org, ["studentId", "==", id]])]);
+  const [cases, docs, match] = await Promise.all([repo.list<Case>("cases", [org, ["studentId", "==", id]]), repo.list<DocumentRecord>("documents", [org, ["studentId", "==", id]]), repo.get<MatchResult>("matchResults", `mr_${id}`)]);
   const write = can(actor.role, "student.write");
   const save = saveProfileAction.bind(null, id);
   const intakeActive = s.intakeToken && s.intakeTokenExpiresAt && s.intakeTokenExpiresAt > new Date().toISOString();
@@ -68,6 +69,37 @@ export default async function StudentPage({ params }: { params: Promise<{ id: st
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><Sparkles className="size-4" /> Suggested universities</CardTitle>
+          <CardDescription>
+            Ranked by {s.intended.field ? <>the course they want (<strong>{s.intended.field}</strong>), </> : "subject, "}CGPA, English score, budget and open intakes. Updates by itself when the profile or a verified transcript / English result changes.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-2">
+          {!match ? <p className="text-sm text-muted-foreground">Fill in the profile (qualification, CGPA, English test, budget, desired course) or verify the transcript, and suggestions appear here.</p> : match.options.length === 0 ? <p className="text-sm text-muted-foreground">{match.honestSummary}</p> : (
+            <>
+              <ul className="divide-y">
+                {match.options.slice(0, 3).map((o, i) => (
+                  <li key={o.programmeId} className="flex flex-wrap items-center justify-between gap-2 py-2">
+                    <div className="min-w-0">
+                      <div className="text-sm"><span className="mr-2 font-semibold tabular-nums">{o.fitScore}</span><span className="font-medium">{o.universityName}</span> <span className="text-xs text-muted-foreground">{o.programmeName} · {COUNTRIES[o.country].name}</span></div>
+                      <div className="text-[11px] text-muted-foreground">{o.why.slice(0, 3).join(" · ")}</div>
+                    </div>
+                    <span className="flex gap-1">
+                      <Badge tone={o.acceptanceBand === "Good" ? "green" : o.acceptanceBand === "Moderate" ? "amber" : "red"}>{i === 0 ? "Best fit · " : ""}{o.acceptanceBand}</Badge>
+                      <Badge>≈ {pkr(o.estimatedTotalCost.amountPKR)}</Badge>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              {!match.strongMatch && match.alternatives.length > 0 && <Alert tone="amber">{match.alternatives[0]}</Alert>}
+              <Link href={`/students/${id}/matching`} className="text-xs text-primary hover:underline">See all {match.options.length} options and create a case →</Link>
+            </>
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader><CardTitle>Student documents ({docs.length})</CardTitle><CardDescription>Documents shared by all of this student's cases. Review them inside a case.</CardDescription></CardHeader>

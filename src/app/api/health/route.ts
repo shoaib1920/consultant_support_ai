@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { aiConfigured } from "@/server/ai";
+import { aiConfigured, aiProviderLabel } from "@/server/ai";
 import { configProblems, isDemoMode } from "@/server/config-check";
 import { firebaseConfigured } from "@/server/db";
 
@@ -11,7 +11,7 @@ export function GET() {
     ok: true,
     mode: isDemoMode() ? "demo" : "live",
     datastore: firebaseConfigured() ? "firestore" : "mock",
-    ai: aiConfigured() ? "claude" : isDemoMode() ? "mock" : "off (staff enter document fields by hand)",
+    ai: aiConfigured() ? aiProviderLabel() : isDemoMode() ? "mock" : "off (staff enter document fields by hand)",
     nightlyJob: process.env.CRON_SECRET ? "configured" : "CRON_SECRET not set",
     missingSettings: problems,
   });
