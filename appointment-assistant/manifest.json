@@ -1,0 +1,11 @@
+{
+  "manifest_version": 3,
+  "name": "Appointment Assistant",
+  "version": "1.0.0",
+  "description": "Keeps student visa-appointment data in one place and fills the form you have open. You review and book yourself.",
+  "permissions": ["activeTab", "scripting", "storage"],
+  "action": {
+    "default_title": "Appointment Assistant",
+    "default_popup": "popup.html"
+  }
+}

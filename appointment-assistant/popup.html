@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Appointment Assistant</title>
+  <style>
+    body { width: 340px; margin: 0; font: 14px/1.45 "Segoe UI", system-ui, sans-serif; color: #13233f; }
+    header { background: #0f1724; color: #fff; padding: 10px 14px; }
+    header strong { font-size: 15px; }
+    header .sub { color: #aebdd4; font-size: 11px; }
+    .body { padding: 12px 14px; }
+    .note { background: #fef3da; border: 1px solid #f0d49a; color: #7a5a12; border-radius: 8px; padding: 8px 10px; font-size: 11px; margin-bottom: 10px; }
+    input[type=search] { width: 100%; padding: 7px 9px; border: 1px solid #e4e9f0; border-radius: 8px; font: inherit; margin-bottom: 8px; }
+    .list { max-height: 230px; overflow: auto; border: 1px solid #e4e9f0; border-radius: 8px; }
+    .item { padding: 8px 10px; border-bottom: 1px solid #eef2f7; cursor: pointer; }
+    .item:last-child { border-bottom: none; }
+    .item.sel { background: #eaf1ff; }
+    .item .nm { font-weight: 600; }
+    .item .pp { color: #5b6b82; font-size: 12px; }
+    .empty { color: #5b6b82; font-size: 13px; padding: 14px 10px; text-align: center; }
+    .btns { display: flex; gap: 8px; margin-top: 10px; }
+    button { flex: 1; cursor: pointer; border-radius: 8px; padding: 9px 10px; font: inherit; font-weight: 600; border: 1px solid #2f6fed; }
+    button.fill { background: #2f6fed; color: #fff; }
+    button.fill:disabled { opacity: .5; cursor: default; }
+    button.open { background: #fff; color: #2f6fed; }
+    .msg { font-size: 12px; color: #5b6b82; margin-top: 8px; min-height: 16px; }
+  </style>
+</head>
+<body>
+  <header><strong>Appointment Assistant</strong><div class="sub">Fill the form you have open — you book</div></header>
+  <div class="body">
+    <div class="note">Open the official site and log in yourself. This fills the visible fields only; it never clicks book, submit or next.</div>
+    <input type="search" id="search" placeholder="Search name / passport" />
+    <div class="list" id="list"><div class="empty">Loading…</div></div>
+    <div class="btns">
+      <button class="fill" id="fillBtn" disabled>Fill the open form</button>
+      <button class="open" id="openBtn">Dashboard</button>
+    </div>
+    <div class="msg" id="msg"></div>
+  </div>
+  <script src="core.js"></script>
+  <script src="storage.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

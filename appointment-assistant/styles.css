@@ -1,0 +1,109 @@
+:root {
+  --bg: #0f1724;
+  --panel: #ffffff;
+  --muted: #5b6b82;
+  --line: #e4e9f0;
+  --ink: #13233f;
+  --accent: #2f6fed;
+  --accent-ink: #ffffff;
+  --amber: #f5a524;
+  --amber-soft: #fef3da;
+  --red: #d64545;
+  --red-soft: #fbe4e4;
+  --green: #1f9d6b;
+  --green-soft: #e4f5ee;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font: 15px/1.5 "Segoe UI", system-ui, -apple-system, sans-serif;
+  color: var(--ink);
+  background: #f4f6fa;
+}
+a { color: var(--accent); }
+.topbar {
+  background: var(--bg);
+  color: #fff;
+  padding: 14px 24px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.topbar .logo { width: 30px; height: 30px; border-radius: 8px; background: linear-gradient(135deg, var(--amber), var(--red)); display: inline-flex; align-items: center; justify-content: center; font-weight: 800; }
+.topbar h1 { font-size: 18px; margin: 0; font-weight: 700; }
+.topbar .sub { color: #aebdd4; font-size: 12px; }
+.wrap { max-width: 1100px; margin: 0 auto; padding: 20px 24px 60px; }
+.notice {
+  background: var(--amber-soft);
+  border: 1px solid #f0d49a;
+  color: #7a5a12;
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 13px;
+  margin-bottom: 18px;
+}
+.grid { display: grid; grid-template-columns: 1fr; gap: 18px; }
+@media (min-width: 900px) { .grid.two { grid-template-columns: 1.3fr 1fr; } }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
+.card h2 { margin: 0 0 4px; font-size: 16px; }
+.card .hint { color: var(--muted); font-size: 13px; margin: 0 0 12px; }
+label { display: block; font-size: 12px; color: var(--muted); margin: 8px 0 3px; }
+input, select, textarea {
+  width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px;
+  font: inherit; color: var(--ink); background: #fff;
+}
+textarea { min-height: 96px; resize: vertical; font-family: ui-monospace, Consolas, monospace; font-size: 12px; }
+.row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.row.three { grid-template-columns: 1fr 1fr 1fr; }
+.btn {
+  display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
+  border: 1px solid var(--accent); background: var(--accent); color: var(--accent-ink);
+  padding: 8px 14px; border-radius: 8px; font: inherit; font-weight: 600;
+}
+.btn.ghost { background: #fff; color: var(--accent); }
+.btn.subtle { background: #fff; color: var(--ink); border-color: var(--line); }
+.btn.danger { background: #fff; color: var(--red); border-color: #efcaca; }
+.btn.sm { padding: 4px 9px; font-size: 12px; }
+.btnrow { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.checks { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 10px; }
+.checks label { display: inline-flex; align-items: center; gap: 6px; margin: 0; color: var(--ink); font-size: 14px; }
+.checks input { width: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { text-align: left; padding: 8px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .03em; }
+td select, td input { padding: 5px 7px; font-size: 13px; }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; }
+.badge.green { background: var(--green-soft); color: var(--green); }
+.badge.amber { background: var(--amber-soft); color: #9a6a0f; }
+.badge.red { background: var(--red-soft); color: var(--red); }
+.badge.muted { background: #eef2f7; color: var(--muted); }
+.remind { border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; font-size: 13px; }
+.remind.red { background: var(--red-soft); }
+.remind.amber { background: var(--amber-soft); }
+.muted { color: var(--muted); }
+.empty { color: var(--muted); font-size: 14px; padding: 10px 0; }
+dialog { border: none; border-radius: 14px; padding: 0; width: min(560px, 94vw); box-shadow: 0 20px 50px rgba(0,0,0,.3); }
+dialog .dlg-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; border-bottom: 1px solid var(--line); }
+dialog .dlg-body { padding: 16px 18px; max-height: 70vh; overflow: auto; }
+.sheet-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.sheet-row .lbl { color: var(--muted); font-size: 12px; }
+.sheet-row .val { font-weight: 600; word-break: break-word; }
+.toast { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); background: var(--ink); color: #fff; padding: 10px 16px; border-radius: 10px; font-size: 13px; opacity: 0; transition: opacity .2s; pointer-events: none; }
+.toast.show { opacity: 1; }
+
+/* --- Account area in the top bar (added with login/trial gating) --- */
+.topbar .topbar-title { flex: 1; }
+.topbar .account { display: flex; align-items: center; gap: 10px; }
+.topbar .acc-email { color: #cfdaec; font-size: 12px; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pill { background: var(--green-soft); color: var(--green); font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 999px; white-space: nowrap; }
+.pill.warn { background: var(--amber-soft); color: #9a6a0f; }
+
+/* --- Access gate overlay --- */
+.gate { position: fixed; inset: 0; z-index: 3000; display: grid; place-items: center; background: #f4f6fa; padding: 20px; }
+.gate-box { background: #fff; border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 20px 60px rgba(15,23,36,.12); padding: 30px 32px; max-width: 420px; text-align: center; }
+.gate-box h2 { margin: 14px 0 6px; font-size: 20px; }
+.gate-box p { color: var(--muted); margin: 0 0 4px; }
+.gate-box code { background: #eef2f7; padding: 1px 6px; border-radius: 5px; font-size: 13px; }
+.gate-box .btnrow { margin-top: 18px; }
+.gate-spin { width: 34px; height: 34px; margin: 0 auto; border: 3px solid #e4e9f0; border-top-color: var(--accent); border-radius: 50%; animation: gate-spin 0.8s linear infinite; }
+@keyframes gate-spin { to { transform: rotate(360deg); } }

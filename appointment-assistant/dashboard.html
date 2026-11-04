@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Appointment Assistant</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="topbar">
+    <span class="logo">A</span>
+    <div class="topbar-title">
+      <h1>Appointment Assistant</h1>
+      <div class="sub">Manage student visa-appointment data in one place</div>
+    </div>
+    <div class="account" id="account" style="display:none">
+      <span class="pill" id="trialPill" style="display:none"></span>
+      <span class="acc-email" id="accEmail"></span>
+      <button class="btn subtle sm" id="signOut">Sign out</button>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div class="notice">
+      <strong>How this works:</strong> this tool keeps your students' data ready and fills official forms for you when you open them.
+      You always open the official site, log in, review, and click <em>book</em> yourself. It never books, submits, or searches for slots on its own.
+    </div>
+
+    <div class="grid two">
+      <div class="card">
+        <h2>Add a student</h2>
+        <p class="hint">One at a time, or import many below.</p>
+        <div class="row">
+          <div><label>Full name (as per passport)</label><input id="f_fullName" /></div>
+          <div><label>Passport number</label><input id="f_passportNumber" /></div>
+        </div>
+        <div class="row three">
+          <div><label>Given name(s)</label><input id="f_givenNames" /></div>
+          <div><label>Surname</label><input id="f_surname" /></div>
+          <div><label>Nationality</label><input id="f_nationality" value="Pakistani" /></div>
+        </div>
+        <div class="row three">
+          <div><label>Date of birth</label><input id="f_dob" type="date" /></div>
+          <div><label>Passport expiry</label><input id="f_passportExpiry" type="date" /></div>
+          <div><label>Gender</label>
+            <select id="f_gender"><option value=""></option><option>Male</option><option>Female</option><option>Other</option></select>
+          </div>
+        </div>
+        <div class="row"><div><label>Email</label><input id="f_email" type="email" /></div><div><label>Phone</label><input id="f_phone" /></div></div>
+        <div class="row"><div><label>City</label><input id="f_city" /></div><div><label>Address</label><input id="f_address" /></div></div>
+        <div class="row three">
+          <div><label>Appointment type</label><select id="f_appointmentType"></select></div>
+          <div><label>Appointment date</label><input id="f_appointmentDate" type="date" /></div>
+          <div><label>Location / centre</label><input id="f_location" /></div>
+        </div>
+        <div class="btnrow"><button class="btn" id="addBtn">Add student</button><button class="btn subtle" id="clearForm">Clear</button></div>
+      </div>
+
+      <div class="card">
+        <h2>Reminders</h2>
+        <p class="hint">Appointments that are overdue or coming up in 7 days.</p>
+        <div id="reminders"><div class="empty">No dated appointments yet.</div></div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:18px">
+      <h2>Import many students at once</h2>
+      <p class="hint">Paste a CSV (with a header row) or a JSON list. Columns like "Full Name", "Passport Number", "Date of Birth", "Email", "Phone" are recognised automatically.</p>
+      <textarea id="bulk" placeholder="Full Name,Passport Number,Date of Birth,Email,Phone&#10;Ali Khan,AB1234567,2001-03-14,ali@example.com,03001234567"></textarea>
+      <div class="btnrow">
+        <button class="btn" id="importBtn">Import</button>
+        <button class="btn subtle" id="sampleBtn">Paste a sample</button>
+        <span id="importMsg" class="muted" style="align-self:center"></span>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:18px">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+        <div><h2 style="margin:0">Students <span class="muted" id="count"></span></h2></div>
+        <div class="btnrow" style="margin:0">
+          <input id="search" placeholder="Search name / passport" style="width:220px" />
+          <button class="btn subtle sm" id="exportBtn">Export JSON</button>
+          <button class="btn danger sm" id="clearAll">Clear all</button>
+        </div>
+      </div>
+      <div style="overflow:auto;margin-top:12px">
+        <table>
+          <thead><tr>
+            <th>Student</th><th>Type</th><th>Status</th><th>Date</th><th>Location / Ref</th><th>Ready</th><th></th>
+          </tr></thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+      <div id="emptyList" class="empty" style="display:none">No students yet. Add one above or import a list.</div>
+    </div>
+  </div>
+
+  <dialog id="sheetDlg">
+    <div class="dlg-head">
+      <strong id="sheetName">Booking data sheet</strong>
+      <button class="btn subtle sm" id="sheetClose">Close</button>
+    </div>
+    <div class="dlg-body">
+      <p class="hint" style="margin-top:0">Open the official form yourself, then copy each value in. Or use the Chrome extension to fill the open form in one click.</p>
+      <div id="readiness" style="margin-bottom:12px"></div>
+      <div class="btnrow" style="margin:0 0 10px"><button class="btn sm" id="copyAll">Copy all</button></div>
+      <div id="sheet"></div>
+    </div>
+  </dialog>
+
+  <div class="toast" id="toast"></div>
+
+  <!-- Covers the page until the account and licence are verified, so nothing shows before the check. -->
+  <div class="gate" id="gate">
+    <div class="gate-box">
+      <div class="gate-spin" id="gateSpin"></div>
+      <h2 id="gateTitle">Checking your account…</h2>
+      <p id="gateText">One moment.</p>
+      <div class="btnrow" id="gateBtns" style="justify-content:center;display:none"></div>
+    </div>
+  </div>
+
+  <script src="vendor/firebase-app-compat.js"></script>
+  <script src="vendor/firebase-auth-compat.js"></script>
+  <script src="vendor/firebase-firestore-compat.js"></script>
+  <script src="firebase-config.js"></script>
+  <script src="core.js"></script>
+  <script src="firebase-glue.js"></script>
+  <script src="storage.js"></script>
+  <script src="gate.js"></script>
+  <script src="dashboard.js"></script>
+</body>
+</html>

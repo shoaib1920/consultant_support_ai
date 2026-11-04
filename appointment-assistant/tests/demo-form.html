@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8" /><title>Demo visa form</title></head>
+<body>
+  <h1>Demo visa appointment form</h1>
+  <form>
+    <label for="gn">Given Name</label><input id="gn" name="firstName" /><br>
+    <label for="sn">Surname</label><input id="sn" name="lastName" /><br>
+    <label for="pp">Passport Number</label><input id="pp" name="passport_no" /><br>
+    <label for="dob">Date of Birth</label><input id="dob" name="dob" /><br>
+    <label for="nat">Nationality</label><input id="nat" name="nationality" /><br>
+    <label for="em">Email Address</label><input id="em" name="email" type="email" /><br>
+    <label for="mob">Mobile Number</label><input id="mob" name="mobile" type="tel" /><br>
+    <label for="q">Search</label><input id="q" name="q" type="search" /><br>
+    <button type="submit">Book appointment</button>
+  </form>
+  <!-- Loads the same two files the extension injects, so this page tests the real fill path. -->
+  <script src="../core.js"></script>
+  <script src="../content-fill.js"></script>
+</body>
+</html>

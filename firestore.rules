@@ -97,6 +97,21 @@ service cloud.firestore {
     match /auditHeads/{id} { allow read, write: if false; }
     match /files/{id} { allow read, write: if false; }
 
+    // --- Appointment Assistant (separate product, its own collection; never touches the above) ---
+    // Per-account licence / 14-day trial. The client may READ its own licence and may CREATE its
+    // trial exactly once; it can never set itself to 'paid', move the trial start, or un-block
+    // itself. Only the Admin SDK or the Firebase console flips status to 'paid' or 'blocked'.
+    // So the trial limit and the pay-block are enforced here, not in the app, and cannot be edited around.
+    match /apptLicenses/{uid} {
+      allow read: if signedIn() && uid == request.auth.uid;
+      allow create: if signedIn() && uid == request.auth.uid
+        && request.resource.data.status == 'trial'
+        && request.resource.data.trialStart == request.time
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.keys().hasOnly(['status', 'trialStart', 'email', 'createdAt']);
+      allow update, delete: if false;
+    }
+
     match /{document=**} { allow read, write: if false; }
   }
 }

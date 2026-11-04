@@ -1,0 +1,32 @@
+{
+  "name": "appointment-assistant",
+  "version": "1.0.0",
+  "description": "Appointment Assistant — manage visa-appointment data and fill official forms (human books).",
+  "main": "main.js",
+  "author": "Devtimize",
+  "license": "UNLICENSED",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test",
+    "dist": "electron-builder --win portable"
+  },
+  "devDependencies": {
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.devtimize.appointmentassistant",
+    "productName": "Appointment Assistant",
+    "directories": { "output": "dist" },
+    "files": [
+      "**/*",
+      "!dist/**",
+      "!tests/**",
+      "!**/*.md",
+      "!node_modules/.cache/**"
+    ],
+    "win": { "target": "portable" },
+    "portable": { "artifactName": "AppointmentAssistant.exe" }
+  }
+}
