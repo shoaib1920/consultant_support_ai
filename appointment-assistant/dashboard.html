@@ -15,6 +15,7 @@
     </div>
     <div class="account" id="account" style="display:none">
       <span class="pill" id="trialPill" style="display:none"></span>
+      <button class="btn sm" id="openBook" style="display:none">Fill official form</button>
       <span class="acc-email" id="accEmail"></span>
       <button class="btn subtle sm" id="signOut">Sign out</button>
     </div>
@@ -129,5 +130,16 @@
   <script src="storage.js"></script>
   <script src="gate.js"></script>
   <script src="dashboard.js"></script>
+  <script>
+    // The in-app browser (Fill official form) exists only in the desktop app, where the preload
+    // exposes window.apptBridge. On the plain website this button stays hidden.
+    (function () {
+      if (!window.apptBridge) return;
+      var b = document.getElementById("openBook");
+      if (!b) return;
+      b.style.display = "";
+      b.addEventListener("click", function () { location.href = "book.html"; });
+    })();
+  </script>
 </body>
 </html>

@@ -5,6 +5,7 @@
  * adds nothing to the behaviour, it only makes the app open as a program (an .exe).
  */
 const { app, BrowserWindow, shell } = require("electron");
+const path = require("path");
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -17,7 +18,9 @@ function createWindow() {
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: true,
+      sandbox: false, // preload-book.js needs Node to read the fill scripts; the page stays isolated
+      webviewTag: true, // the in-app browser (book.html) embeds the official site in a <webview>
+      preload: path.join(__dirname, "preload-book.js"),
     },
   });
   win.removeMenu();

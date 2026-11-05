@@ -1,0 +1,29 @@
+rules_version = '2';
+
+// Appointment Assistant — Firestore rules for its OWN Firebase project (separate from VisaGuard).
+// Deploy these to the appointment-assistant Firebase project, not to VisaGuard's.
+//
+// The only client-writable thing is each account's licence. A signed-in user may read its own
+// licence and start its 14-day trial exactly once — it can never set itself to 'paid', move the
+// trial start, or un-block itself. Only the Firebase console / Admin SDK flips status to paid/blocked.
+// So the trial limit and the pay-block are enforced here, not in the app, and cannot be edited around.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+
+    match /apptLicenses/{uid} {
+      allow read: if signedIn() && uid == request.auth.uid;
+      allow create: if signedIn() && uid == request.auth.uid
+        && request.resource.data.status == 'trial'
+        && request.resource.data.trialStart == request.time
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.keys().hasOnly(['status', 'trialStart', 'email', 'createdAt']);
+      allow update, delete: if false;
+    }
+
+    // Nothing else is reachable from a client.
+    match /{document=**} { allow read, write: if false; }
+  }
+}

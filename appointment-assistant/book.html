@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Fill official form — Appointment Assistant</title>
+  <style>
+    :root { --ink:#13233f; --muted:#5b6b82; --line:#e4e9f0; --blue:#2f6fed; --amber-soft:#fef3da; --amber-ink:#7a5a12; --green:#1f9d6b; }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body { display: flex; flex-direction: column; font: 14px/1.5 "Segoe UI", system-ui, sans-serif; color: var(--ink); background: #fff; }
+    .bar { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+    .bar.top { background: #0f1724; color: #fff; }
+    .bar.top .title { font-weight: 700; }
+    button, select, input { font: inherit; }
+    .btn { border: 1px solid var(--blue); background: var(--blue); color: #fff; border-radius: 8px; padding: 7px 12px; font-weight: 600; cursor: pointer; }
+    .btn.subtle { background: #fff; color: var(--ink); border-color: var(--line); }
+    .btn.ghost { background: transparent; color: #fff; border-color: #33415c; }
+    .btn:disabled { opacity: .5; cursor: default; }
+    select { padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; min-width: 190px; }
+    #addr { flex: 1; min-width: 180px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; }
+    .status { font-size: 12px; color: #cfdaec; }
+    .notice { background: var(--amber-soft); color: var(--amber-ink); border-bottom: 1px solid #f0d49a; font-size: 12px; padding: 7px 12px; }
+    .notice b { color: #5c3d00; }
+    webview { flex: 1; border: 0; width: 100%; }
+    .wv-wrap { flex: 1; display: flex; }
+    .nav { display: flex; gap: 6px; }
+    .nav button { border: 1px solid var(--line); background: #fff; border-radius: 8px; padding: 6px 10px; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <div class="bar top">
+    <button class="btn ghost" id="back">&larr; Dashboard</button>
+    <span class="title">Fill official form</span>
+    <select id="student"><option value="">Select a student…</option></select>
+    <button class="btn" id="fill" disabled>Fill this form</button>
+    <span class="status" id="status"></span>
+  </div>
+
+  <div class="notice">
+    <b>You do the booking.</b> This only types the student's details into the form you open.
+    You still solve the CAPTCHA, do the selfie/liveness, pick the slot, pay, and click book yourself.
+    It never submits, never searches for slots, and never gets past any check.
+  </div>
+
+  <div class="bar">
+    <div class="nav">
+      <button id="navBack" title="Back">&#8249;</button>
+      <button id="navFwd" title="Forward">&#8250;</button>
+      <button id="navReload" title="Reload">&#8635;</button>
+    </div>
+    <input id="addr" placeholder="Paste the official appointment site URL and press Enter (e.g. visa.vfsglobal.com)" />
+    <button class="btn subtle" id="go">Go</button>
+  </div>
+
+  <div class="wv-wrap">
+    <webview id="site" partition="persist:apptsite" src="about:blank" allowpopups></webview>
+  </div>
+
+  <script src="vendor/firebase-app-compat.js"></script>
+  <script src="vendor/firebase-auth-compat.js"></script>
+  <script src="firebase-config.js"></script>
+  <script src="core.js"></script>
+  <script src="firebase-glue.js"></script>
+  <script src="storage.js"></script>
+  <script src="book.js"></script>
+</body>
+</html>

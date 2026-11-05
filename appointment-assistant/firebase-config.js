@@ -1,19 +1,17 @@
 /*
  * Firebase web config for the Appointment Assistant.
  *
- * These five values are the SAME ones VisaGuard uses (the .env.local NEXT_PUBLIC_FIREBASE_* keys).
- * They are PUBLIC by design — Firebase expects them in client code — so it is safe to ship them in
- * the .exe and the website. What actually protects your data is the Firestore rules (firestore.rules),
- * not these keys. NOTE: never put the service-account JSON (the admin private key) in this file.
- *
- * This app writes ONLY to its own collection (apptLicenses/<uid>); it never touches VisaGuard's data.
+ * This app has its OWN Firebase project (separate from VisaGuard) so the two never share users or
+ * data. These five values are PUBLIC by design — Firebase ships them in client code — so it is safe
+ * to put them in the .exe and the website. The Firestore rules (firestore.rules) are what protect
+ * the data, not these keys. NOTE: never put a service-account JSON (admin private key) in this file.
  */
 window.APPT_FIREBASE_CONFIG = {
-  apiKey: "AIzaSyBVZcKedJP9oY9xjRf5nRIHPN1gjv28fL0",
-  authDomain: "consultantai-6a444.firebaseapp.com",
-  projectId: "consultantai-6a444",
-  storageBucket: "consultantai-6a444.firebasestorage.app",
-  appId: "1:939931045742:web:aeef97b60c33a97ca63b7f",
+  apiKey: "AIzaSyApBdrRWfmXLBf4RdV3eIynieYxF6sYvO8",
+  authDomain: "appointmentbookingbotconsalt.firebaseapp.com",
+  projectId: "appointmentbookingbotconsalt",
+  storageBucket: "appointmentbookingbotconsalt.firebasestorage.app",
+  appId: "1:133378992254:web:64e7dd74cc584692c9102f",
 };
 
 // How long a brand-new account may use the app for free before paying.
